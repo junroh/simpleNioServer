@@ -1,2 +1,2 @@
 # simpleNioServer
-Simple (SSL) NIO Server for JAVA
+Simple (SSL) NIO Server in JAVA
