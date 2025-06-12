@@ -148,8 +148,6 @@ public class ConnectedSocket {
                     ByteBuffer appBuffer;
                     try {
                         appBuffer = sslEngineBuffer.unwrap(buff);
-                    /*} catch (BufferUnderflowException e) {
-                        log.debug("buffer underflow");*/
                     } catch (Exception e) {
                         log.error("error on unwrapping data " + e);
                         return new LinkedList<>();
@@ -181,7 +179,7 @@ public class ConnectedSocket {
         writeMsgs.add(msg);
     }
 
-    public boolean makeReadyBuffer() {
+    public boolean prepareBuffersForWriting() {
         Message msg;
         while((msg=writeMsgs.poll())!=null) {
             for(byte[] buff: msg.getDatas()) {
@@ -190,8 +188,6 @@ public class ConnectedSocket {
                     ByteBuffer netBuffer;
                     try {
                         netBuffer = sslEngineBuffer.wrap(byteBuffer);
-                /*} catch (BufferUnderflowException e) {
-                    log.debug("buffer underflow");*/
                     } catch (Exception e) {
                         log.error("error on unwrapping data " + e);
                         return false;

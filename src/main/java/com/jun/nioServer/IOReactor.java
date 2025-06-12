@@ -1,9 +1,13 @@
 package com.jun.nioServer;
 
+import com.jun.http.NioMessageHandler;
 import com.jun.nioServer.handler.MsgHandler;
 import com.jun.nioServer.handler.OnCompleteListener;
+import com.jun.nioServer.handler.SimpleNioMessageHandler;
 import com.jun.nioServer.handler.SocketReadHandler;
 import com.jun.nioServer.handler.SocketWriteHandler;
+import com.jun.nioServer.msg.IMessageReaderFactory;
+import com.jun.nioServer.msg.http.HttpMessageReaderFactory;
 import org.apache.log4j.Logger;
 
 import javax.net.ssl.SSLContext;
@@ -37,7 +41,9 @@ public class IOReactor implements Runnable {
         } else {
             selector = givenSelector;
         }
-        this.msgHandler = new MsgHandler();
+        IMessageReaderFactory readerFactory = new HttpMessageReaderFactory();
+        NioMessageHandler nioMessageHandler = new SimpleNioMessageHandler();
+        this.msgHandler = new MsgHandler(readerFactory, nioMessageHandler);
         this.readerPool = readerPool;
         this.writerPool = writerPool;
         this.thread = new Thread(this, this.getClass().getSimpleName());

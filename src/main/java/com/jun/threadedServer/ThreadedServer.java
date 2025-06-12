@@ -1,5 +1,7 @@
 package com.jun.threadedServer;
 
+import com.jun.config.ServerConfig;
+import com.jun.http.HttpRequestHandler;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
@@ -11,12 +13,12 @@ import java.util.concurrent.Executors;
 public class ThreadedServer implements Runnable{
 
     private static final Logger log = Logger.getLogger(ThreadedServer.class);
-    private static final int BACKLOG = 1024;
+    private static final int BACKLOG = ServerConfig.THREADED_SERVER_BACKLOG;
 
-    protected int          serverPort   = 8080;
+    protected int          serverPort   = ServerConfig.THREADED_SERVER_PORT;
     protected ServerSocket serverSocket = null;
     protected boolean      isStopped    = false;
-    protected ExecutorService threadPool = Executors.newFixedThreadPool(100);
+    protected ExecutorService threadPool = Executors.newFixedThreadPool(ServerConfig.THREADED_SERVER_POOL_SIZE);
     private Thread server;
 
     public ThreadedServer(int port){
@@ -38,9 +40,10 @@ public class ThreadedServer implements Runnable{
                 throw new RuntimeException(
                     "Error accepting client connection", e);
             }
+            HttpRequestHandler handler = new SimpleThreadedHttpRequestHandler();
             this.threadPool.submit(
                 new Worker(clientSocket,
-                    "Thread Pooled Server"));
+                    "Thread Pooled Server", handler));
         }
         this.threadPool.shutdown();
         log.info("Server Stopped.") ;
@@ -76,7 +79,7 @@ public class ThreadedServer implements Runnable{
         try {
             this.serverSocket = new ServerSocket(this.serverPort, BACKLOG);
         } catch (IOException e) {
-            throw new RuntimeException("Cannot open port 8080", e);
+            throw new RuntimeException("Cannot open port " + this.serverPort, e);
         }
     }
 }
