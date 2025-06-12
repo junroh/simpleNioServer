@@ -43,7 +43,7 @@ public class SocketReadHandlerTest {
     public void testRun_SuccessfulRead() throws IOException {
         // Simulate SocketChannel.read() populating the buffer
         when(mockSocketChannel.read(any(ByteBuffer.class))).thenAnswer(invocation -> {
-            ByteBuffer b = invocation.getArgument(0);
+            ByteBuffer b = invocation.getArgumentAt(0, ByteBuffer.class);
             byte[] testData = "TestData".getBytes("UTF-8");
             b.put(testData);
             return testData.length;
@@ -141,8 +141,12 @@ public class SocketReadHandlerTest {
         // Let's assume SocketChannel.read() on an already closed (but not yet by this handler) socket returns -1.
         when(mockSocketChannel.read(any(ByteBuffer.class))).thenReturn(-1);
 
-
-        readHandler.run();
+        try {
+            readHandler.run();
+        } catch (Exception e) { // Catching Exception generally for a test is okay if we assert on it
+            // This should not happen if SocketReadHandler.run() catches IOException
+            fail("IOException should have been handled by SocketReadHandler.run(): " + e.getMessage());
+        }
 
         verify(mockConnectedSocket).tryReadLock();
         // readSocket is called, which reads from mockSocketChannel

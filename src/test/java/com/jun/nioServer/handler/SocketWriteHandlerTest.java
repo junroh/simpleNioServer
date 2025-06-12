@@ -61,7 +61,7 @@ public class SocketWriteHandlerTest {
 
         when(mockSocketChannel.write(any(ByteBuffer.class)))
             .thenAnswer(invocation -> {
-                ByteBuffer b = invocation.getArgument(0);
+                ByteBuffer b = invocation.getArgumentAt(0, ByteBuffer.class);
                 int r = b.remaining();
                 b.position(b.limit());
                 return r;
@@ -92,7 +92,7 @@ public class SocketWriteHandlerTest {
 
         when(mockConnectedSocket.getWritebuffers()).thenReturn(writeBuffers);
         when(mockSocketChannel.write(any(ByteBuffer.class))).thenAnswer(invocation -> {
-            ByteBuffer b = invocation.getArgument(0);
+            ByteBuffer b = invocation.getArgumentAt(0, ByteBuffer.class);
             // Simulate partial write by advancing position less than limit
             b.position(b.position() + writtenAmount);
             return writtenAmount;
@@ -121,7 +121,13 @@ public class SocketWriteHandlerTest {
         IOException testException = new IOException("Test write error");
         when(mockSocketChannel.write(any(ByteBuffer.class))).thenThrow(testException);
 
-        writeHandler.run();
+        try {
+            writeHandler.run();
+        } catch (Exception e) {
+            // This test expects an exception to be caught by the handler's listener,
+            // not propagated from run(). If run() threw, it's a problem with run's catch block.
+            fail("Exception should have been handled by SocketWriteHandler.run() and passed to listener: " + e.getMessage());
+        }
 
         verify(mockConnectedSocket).tryWriteLock();
         verify(mockSocketChannel).write(any(ByteBuffer.class));
@@ -131,7 +137,7 @@ public class SocketWriteHandlerTest {
     }
 
     @Test
-    public void testRun_NoDataToWrite() {
+    public void testRun_NoDataToWrite() throws IOException {
         when(mockConnectedSocket.getWritebuffers()).thenReturn(new ArrayList<>());
 
         writeHandler.run();
