@@ -1,22 +1,22 @@
 package com.jun.nioServer;
 
-import com.jun.config.ServerConfig; // For NIO_ACCEPTOR_IS_BLOCKING
+// import com.jun.config.ServerConfig; // Only used in comments, removing for strictness
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor; // Used in commented out example
+// import org.mockito.Captor; // Annotation not used
+// import org.mockito.InjectMocks; // Annotation not used
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import static org.mockito.Mockito.*;
 import static org.junit.Assert.*;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
+import java.io.IOException; // Used in commented out example
+// import java.net.InetSocketAddress; // Not used
+// import java.net.ServerSocket; // Not used
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutorService; // Used for @Mock
 import javax.net.ssl.SSLContext;
 
 // Analysis of Acceptor.java Testability:

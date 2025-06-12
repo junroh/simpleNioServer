@@ -15,7 +15,6 @@ public class SimpleNioMessageHandler implements NioMessageHandler {
 
     @Override
     public void processMessage(Message requestMessage, ConnectedSocket connectedSocket) throws IOException {
-        // Logic from original MsgHandler.process()
         String responseBody = String.format(
             ServerConfig.NIO_MSG_HANDLER_RESPONSE_BODY_FORMAT,
             connectedSocket.getSocketId(),
@@ -53,7 +52,7 @@ public class SimpleNioMessageHandler implements NioMessageHandler {
 
         connectedSocket.addWriteReadyMsg(response);
 
-        if(connectedSocket.makeReadyBuffer()) {
+        if(connectedSocket.prepareBuffersForWriting()) {
             log.debug("Response message is ready on socket " + connectedSocket.getSocketId());
             // Check if key is valid before operating on it
             if (connectedSocket.getKey() != null && connectedSocket.getKey().isValid()) {

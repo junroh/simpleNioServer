@@ -12,7 +12,7 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.nio.charset.StandardCharsets; // For Java 7+, "UTF-8" for Java 6
+// import java.nio.charset.StandardCharsets; // Not used
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -44,7 +44,7 @@ public class SimpleNioMessageHandlerTest {
 
     @Test
     public void testProcessMessage_GeneratesResponseAndSetsOpWrite() throws IOException {
-        when(mockConnectedSocket.makeReadyBuffer()).thenReturn(true);
+        when(mockConnectedSocket.prepareBuffersForWriting()).thenReturn(true);
 
         handler.processMessage(mockRequestMessage, mockConnectedSocket);
 
@@ -71,19 +71,19 @@ public class SimpleNioMessageHandlerTest {
         // assertTrue(fullResponseStr.endsWith(expectedBody));
 
 
-        verify(mockConnectedSocket).makeReadyBuffer();
+        verify(mockConnectedSocket).prepareBuffersForWriting();
         verify(mockConnectedSocket).addInterestedOps(SelectionKey.OP_WRITE);
         verify(mockSelector).wakeup();
     }
 
     @Test
     public void testProcessMessage_WhenMakeReadyBufferFalse_DoesNotSetOpWrite() throws IOException {
-        when(mockConnectedSocket.makeReadyBuffer()).thenReturn(false);
+        when(mockConnectedSocket.prepareBuffersForWriting()).thenReturn(false);
 
         handler.processMessage(mockRequestMessage, mockConnectedSocket);
 
         verify(mockConnectedSocket).addWriteReadyMsg(any(Message.class));
-        verify(mockConnectedSocket).makeReadyBuffer();
+        verify(mockConnectedSocket).prepareBuffersForWriting();
         verify(mockConnectedSocket, never()).addInterestedOps(SelectionKey.OP_WRITE);
         verify(mockSelector, never()).wakeup();
     }

@@ -24,7 +24,7 @@ public class MsgHandlerTest {
     @Mock private IMessageReader mockMessageReader;
     @Mock private NioMessageHandler mockNioMessageHandler;
     @Mock private ConnectedSocket mockConnectedSocket;
-    @Mock private Message mockRequestMessage; // Renamed for clarity from mockMessage to mockRequestMessage
+    @Mock private Message mockRequestMessage;
 
     private MsgHandler msgHandler;
 

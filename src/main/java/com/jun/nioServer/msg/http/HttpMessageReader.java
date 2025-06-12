@@ -28,7 +28,7 @@ public class HttpMessageReader implements IMessageReader {
         Message msg = new Message(socket);
         msg.setHeader(new HttpHeaders());
         int idx = 0;
-        int lasCompIdx = -1;
+        int lastCompleteBufferIndex = -1;
         for(ByteBuffer buffer: buffers) {
             int startIdx = 0;
             int remaining = buffer.limit();
@@ -45,7 +45,7 @@ public class HttpMessageReader implements IMessageReader {
                 msg.writeToMessage(buffer.array(), startIdx, endIdx);
                 remaining -= (endIdx - startIdx);
                 if (isCompletedMsg) {
-                    lasCompIdx = idx;
+                    lastCompleteBufferIndex = idx;
                     socket.addReadReadyMsg(msg);
                     if (remaining != 0) {
                         log.debug("There is a remaining data");
@@ -57,6 +57,6 @@ public class HttpMessageReader implements IMessageReader {
             } while (remaining != 0);
             idx++;
         }
-        return lasCompIdx;
+        return lastCompleteBufferIndex;
     }
 }

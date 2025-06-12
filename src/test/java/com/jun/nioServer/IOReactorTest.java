@@ -4,7 +4,6 @@ package com.jun.nioServer;
 import com.jun.http.NioMessageHandler;
 import com.jun.nioServer.handler.MsgHandler; // For constructor, will be mocked (actually not, IOReactor creates it)
 import com.jun.nioServer.msg.IMessageReaderFactory;
-// NioMessageHandler is already imported from com.jun.http
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;

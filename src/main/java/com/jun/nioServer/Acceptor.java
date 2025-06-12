@@ -21,11 +21,24 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * The Acceptor thread is responsible for accepting incoming client connections.
+ * It can operate in two modes for connection acceptance, configured by
+ * {@link ServerConfig#NIO_ACCEPTOR_IS_BLOCKING}:
+ * 1. Blocking mode: Uses traditional {@code ServerSocketChannel.accept()} in a loop.
+ *    Each accepted connection is then handled by a {@code ConAcceptor} task submitted
+ *    to an ExecutorService.
+ * 2. Non-blocking mode: Configures the ServerSocketChannel for non-blocking mode and
+ *    uses a Selector to detect OP_ACCEPT events. Accepted connections are handled similarly.
+ *
+ * Accepted connections (SocketChannel) are then registered with one of the IOReactor threads
+ * for further I/O processing (read/write).
+ */
 public class Acceptor extends Thread {
 
     private static final Logger log = Logger.getLogger(Acceptor.class);
 
-    private final ExecutorService es;
+    private final ExecutorService conAcceptorExecutor;
 
     private ServerSocketChannel serverSocketChannel;
     private SSLContext sslContext;
@@ -62,7 +75,7 @@ public class Acceptor extends Thread {
             log.error("binding error on " + bindAddress.toString() + ":"+ serverPort);
         }
         setName(this.getClass().getSimpleName());
-        es = Executors.newFixedThreadPool(ServerConfig.NIO_ACCEPTOR_NUM_IOREACTOR);
+        conAcceptorExecutor = Executors.newFixedThreadPool(ServerConfig.NIO_ACCEPTOR_NUM_IOREACTOR);
     }
 
     void stopThread() {
@@ -89,7 +102,7 @@ public class Acceptor extends Thread {
             try {
                 if(ServerConfig.NIO_ACCEPTOR_IS_BLOCKING) {
                     SocketChannel socketChannel = serverSocketChannel.accept();
-                    es.submit(new ConAcceptor(socketChannel));
+                    conAcceptorExecutor.submit(new ConAcceptor(socketChannel));
                 } else {
                     selector.select();
                     Set<SelectionKey> selected = selector.selectedKeys();
@@ -97,7 +110,7 @@ public class Acceptor extends Thread {
                         if(key.isAcceptable()) {
                             Runnable r = (Runnable) (key.attachment());
                             if (r != null) {
-                                es.submit(r);
+                                conAcceptorExecutor.submit(r);
                             }
                         }
                     }
@@ -107,7 +120,7 @@ public class Acceptor extends Thread {
                 log.error("IOException in Acceptor run loop", e);
             }
         }
-        es.shutdown();
+        conAcceptorExecutor.shutdown();
         log.info("Stopped acceptor");
     }
 
@@ -177,7 +190,8 @@ public class Acceptor extends Thread {
                 }
                 regSocket(socketChannel);
             } catch (IOException ignore) {
-                // do nothing
+                // Ignored, possibly due to server shutdown or channel closed before accept completed.
+                // Specific exceptions during accept() under normal operation are handled in the main run loop.
             }
         }
 

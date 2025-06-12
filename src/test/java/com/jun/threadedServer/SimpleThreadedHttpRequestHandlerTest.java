@@ -6,7 +6,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets; // For Java 7+, for Java 6 use "UTF-8" string
+// import java.nio.charset.StandardCharsets; // Not used
 
 import static org.junit.Assert.*;
 
@@ -27,7 +27,6 @@ public class SimpleThreadedHttpRequestHandlerTest {
         // For Java 6, use new String(mockOutputStream.toByteArray(), "UTF-8")
         String responseString = new String(mockOutputStream.toByteArray(), "UTF-8");
 
-        // Assertions
         assertTrue("Response should start with HTTP status line", responseString.startsWith("HTTP/1.1 200 OK\n\nWorkerRunnable: "));
         assertTrue("Response should contain serverText", responseString.contains("WorkerRunnable: " + serverText + " - "));
 

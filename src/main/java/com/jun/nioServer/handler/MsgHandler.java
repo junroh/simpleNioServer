@@ -22,7 +22,7 @@ public class MsgHandler implements Runnable {
     private static final BlockingQueue<ConnectedSocket> readyToMsgQ = new LinkedBlockingQueue<>();
     private IMessageReader msgParser; // Will be initialized via factory in constructor
     private final Thread thread;
-    private final IMessageReaderFactory messageReaderFactory; // This field was added in subtask 16
+    private final IMessageReaderFactory messageReaderFactory;
     private final NioMessageHandler messageProcessor;
 
     public boolean enqueue(ConnectedSocket socket) {

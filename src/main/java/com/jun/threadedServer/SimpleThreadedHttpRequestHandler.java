@@ -20,7 +20,7 @@ public class SimpleThreadedHttpRequestHandler implements HttpRequestHandler {
         String response = "HTTP/1.1 200 OK\n\nWorkerRunnable: " +
                           serverText + " - " +
                           time;
-        outputStream.write(response.getBytes("UTF-8")); // Specify charset
+        outputStream.write(response.getBytes("UTF-8"));
         // inputStream.close(); // Original Worker closed input stream here.
         // outputStream.close(); // Original Worker closed output stream here.
         log.debug("Response sent by SimpleThreadedHttpRequestHandler: " + time + " for serverText: " + serverText);
