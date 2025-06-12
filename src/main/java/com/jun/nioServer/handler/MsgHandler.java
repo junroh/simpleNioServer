@@ -1,5 +1,7 @@
 package com.jun.nioServer.handler;
 
+import com.jun.config.ServerConfig;
+import com.jun.http.NioMessageHandler;
 import com.jun.nioServer.ConnectedSocket;
 import com.jun.nioServer.msg.IMessageReader;
 import com.jun.nioServer.msg.Message;
@@ -8,7 +10,6 @@ import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -19,14 +20,16 @@ public class MsgHandler implements Runnable {
     private static final BlockingQueue<ConnectedSocket> readyToMsgQ = new LinkedBlockingQueue<>();
     private final IMessageReader msgParser;
     private final Thread thread;
+    private final NioMessageHandler messageProcessor;
 
     public boolean enqueue(ConnectedSocket socket) {
         return readyToMsgQ.offer(socket);
     }
 
     public MsgHandler() {
-        msgParser = new HttpMessageReaderFactory().createMessageReader();
-        thread = new Thread(this, MsgHandler.class.getSimpleName());
+        this.msgParser = new HttpMessageReaderFactory().createMessageReader();
+        this.thread = new Thread(this, MsgHandler.class.getSimpleName());
+        this.messageProcessor = new SimpleNioMessageHandler();
     }
 
     public synchronized void start() {
@@ -84,25 +87,7 @@ public class MsgHandler implements Runnable {
     }
 
     private void process(Message message) throws IOException {
-        ConnectedSocket connectedSocket = message.socketChannel;
-        String httpResponse = String.format(
-            "HTTP/1.1 200 OK\r\n" +
-                "Content-Length: 38\r\n" +
-                "Content-Type: text/html\r\n" +
-                "\r\n" +
-                "<html><body>Hello World(%d-%d)</body></html>",
-            connectedSocket.getSocketId(), message.getId());
-        byte[] httpResponseBytes = httpResponse.getBytes("UTF-8");
-
-        log.debug("Processing socket: " + connectedSocket.getSocketId() + " - " + message.getId());
-        Message response = new Message(connectedSocket, message.getId());
-        response.writeToMessage(httpResponseBytes);
-        connectedSocket.addWriteReadyMsg(response);
-
-        if(connectedSocket.makeReadyBuffer()) {
-            log.debug("message is ready on socket " + connectedSocket.getSocketId());
-            connectedSocket.addInterestedOps(SelectionKey.OP_WRITE);
-            connectedSocket.getKey().selector().wakeup();
-        }
+        // The ConnectedSocket is available via message.socketChannel
+        this.messageProcessor.processMessage(message, message.socketChannel);
     }
 }

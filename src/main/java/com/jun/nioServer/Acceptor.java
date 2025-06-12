@@ -1,5 +1,6 @@
 package com.jun.nioServer;
 
+import com.jun.config.ServerConfig;
 import com.jun.nioServer.utility.NamedThreadFactory;
 import org.apache.log4j.Logger;
 
@@ -23,11 +24,6 @@ import java.util.concurrent.Executors;
 public class Acceptor extends Thread {
 
     private static final Logger log = Logger.getLogger(Acceptor.class);
-    private static final boolean IS_BLOCKING = true;
-    private static final int BACKLOG = 1024;
-    private static final int NUM_IOREACTOR = 1;
-    private static final int NUM_READER = 2;
-    private static final int NUM_WRITER = 2;
 
     private final ExecutorService es;
 
@@ -40,21 +36,21 @@ public class Acceptor extends Thread {
     private Selector selector;
 
     public Acceptor(String address, int serverPort, boolean isSSL) throws Exception {
-        InetAddress bindAddress = InetAddress.getByName(address);
+        InetAddress bindAddress = InetAddress.getByName(ServerConfig.NIO_ACCEPTOR_ADDRESS);
         try {
             socketId = 0;
             serverSocketChannel = ServerSocketChannel.open();
-            serverSocketChannel.bind(new InetSocketAddress(bindAddress, serverPort), BACKLOG);
+            serverSocketChannel.bind(new InetSocketAddress(bindAddress, serverPort), ServerConfig.NIO_ACCEPTOR_BACKLOG);
 
             if (isSSL) {
                 sslContext = SSLContext.getInstance("TLS");
                 sslContext.init(
-                    createKeyManagers("./src/main/resources/server.jks", "storepass", "keypass"),
-                    createTrustManagers("./src/main/resources/trustedCerts.jks", "storepass"),
+                    createKeyManagers(ServerConfig.SSL_KEYSTORE_PATH, ServerConfig.SSL_KEYSTORE_PASSWORD, ServerConfig.SSL_KEY_PASSWORD),
+                    createTrustManagers(ServerConfig.SSL_TRUSTSTORE_PATH, ServerConfig.SSL_TRUSTSTORE_PASSWORD),
                     new SecureRandom());
             }
 
-            if(!IS_BLOCKING) {
+            if(!ServerConfig.NIO_ACCEPTOR_IS_BLOCKING) {
                 setNonBlockingMode();
             }
             startIOReactor();
@@ -66,7 +62,7 @@ public class Acceptor extends Thread {
             log.error("binding error on " + bindAddress.toString() + ":"+ serverPort);
         }
         setName(this.getClass().getSimpleName());
-        es = Executors.newFixedThreadPool(NUM_IOREACTOR);
+        es = Executors.newFixedThreadPool(ServerConfig.NIO_ACCEPTOR_NUM_IOREACTOR);
     }
 
     void stopThread() {
@@ -91,7 +87,7 @@ public class Acceptor extends Thread {
         log.info("Started acceptor");
         while(!Thread.currentThread().isInterrupted()){
             try {
-                if(IS_BLOCKING) {
+                if(ServerConfig.NIO_ACCEPTOR_IS_BLOCKING) {
                     SocketChannel socketChannel = serverSocketChannel.accept();
                     es.submit(new ConAcceptor(socketChannel));
                 } else {
@@ -108,7 +104,7 @@ public class Acceptor extends Thread {
                     selected.clear();
                 }
             } catch(IOException e){
-                e.printStackTrace();
+                log.error("IOException in Acceptor run loop", e);
             }
         }
         es.shutdown();
@@ -124,10 +120,10 @@ public class Acceptor extends Thread {
 
     private void startIOReactor() throws IOException {
         ExecutorService readerPool =
-            Executors.newFixedThreadPool(NUM_READER, new NamedThreadFactory("Reader"));
+            Executors.newFixedThreadPool(ServerConfig.NIO_ACCEPTOR_NUM_READER_THREADS, new NamedThreadFactory("Reader"));
         ExecutorService writerPool =
-            Executors.newFixedThreadPool(NUM_WRITER, new NamedThreadFactory("Writer"));
-        ioReactors = new IOReactor[NUM_IOREACTOR];
+            Executors.newFixedThreadPool(ServerConfig.NIO_ACCEPTOR_NUM_WRITER_THREADS, new NamedThreadFactory("Writer"));
+        ioReactors = new IOReactor[ServerConfig.NIO_ACCEPTOR_NUM_IOREACTOR];
         for(int i=0;i< ioReactors.length; i++) {
             ioReactors[i] = new IOReactor(null, readerPool, writerPool);
             ioReactors[i].startThread();

@@ -1,5 +1,6 @@
 package com.jun.threadedServer;
 
+import com.jun.http.HttpRequestHandler;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
@@ -13,28 +14,44 @@ public class Worker implements Runnable{
 
     protected Socket clientSocket = null;
     protected String serverText   = null;
+    private final HttpRequestHandler requestHandler;
 
-    public Worker(Socket clientSocket, String serverText) {
+    public Worker(Socket clientSocket, String serverText, HttpRequestHandler requestHandler) {
         this.clientSocket = clientSocket;
         this.serverText   = serverText;
+        this.requestHandler = requestHandler;
     }
 
     public void run() {
+        InputStream input = null;
+        OutputStream output = null;
         try {
-            InputStream input  = clientSocket.getInputStream();
-            OutputStream output = clientSocket.getOutputStream();
-            long time = System.currentTimeMillis();
-            output.write(("HTTP/1.1 200 OK\n\nWorkerRunnable: " +
-                this.serverText + " - " +
-                time +
-                "").getBytes());
-            output.close();
-            input.close();
-            clientSocket.close();
-            log.debug("Request processed: " + time);
+            input  = clientSocket.getInputStream();
+            output = clientSocket.getOutputStream();
+
+            this.requestHandler.handle(input, output, this.serverText); // Call the handler
+
         } catch (IOException e) {
-            //report exception somewhere.
-            e.printStackTrace();
+            log.error("Error processing client request for socket: " + clientSocket, e);
+        } finally {
+            try {
+                if (output != null) output.close();
+            } catch (IOException e) {
+                log.warn("Error closing output stream for socket: " + clientSocket, e);
+            }
+            try {
+                if (input != null) input.close();
+            } catch (IOException e) {
+                log.warn("Error closing input stream for socket: " + clientSocket, e);
+            }
+            try {
+                if (clientSocket != null && !clientSocket.isClosed()) {
+                    clientSocket.close();
+                }
+            } catch (IOException e) {
+                log.warn("Error closing client socket: " + clientSocket, e);
+            }
+            log.debug("Request processed and resources closed for client: " + (clientSocket != null ? clientSocket.getInetAddress() : "unknown"));
         }
     }
 }
