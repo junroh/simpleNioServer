@@ -1,57 +1,60 @@
 # Java NIO/Threaded HTTP Server
 
-This project implements a simple HTTP server in Java. It can operate in two modes:
-- **NIO (Non-blocking I/O) Mode:** Utilizes Java NIO for scalable network communication, suitable for handling many concurrent connections with minimal threads.
-- **Threaded Mode:** Uses a traditional thread-per-connection model.
+This project implements a simple HTTP server in Java, offering two operational modes:
+- **NIO (Non-blocking I/O) Mode:** Leverages Java NIO for scalable network communication, ideal for managing numerous concurrent connections with a minimal number of threads.
+- **Threaded Mode:** Employs a classic thread-per-connection model.
 
-This allows for a comparison and understanding of these two different approaches to server-side Java development.
+This project allows for a comparison and understanding of these two distinct approaches to server-side Java development.
 
 ## Server Types
 
-The server can be started in one of two modes, controlled by the `server.type` Java system property.
+The server operates in one of two modes, selectable via the `server.type` Java system property:
 
 ### NIO (Non-blocking I/O) Server
 
-- **Description:** This mode uses the Java NIO (New I/O) APIs to handle client connections. It's designed for high concurrency and efficiency, as it can manage multiple connections with a small number of threads. Incoming connections are accepted by an `Acceptor` thread, and I/O operations (reading requests, writing responses) are handled by one or more `IOReactor` threads.
-- **To run:** Set the system property `-Dserver.type=nio` or do not set the property (it defaults to nio).
+- **Description:** This mode utilizes the Java NIO (New I/O) APIs for handling client connections. It is designed for high concurrency and efficiency, capable of managing multiple connections with a limited number of threads. An `Acceptor` thread accepts incoming connections, while I/O operations (reading requests, writing responses) are managed by one or more `IOReactor` threads.
+- **To run:** Set the system property `-Dserver.type=nio`. This is the default mode if the property is not specified.
 
 ### Threaded Server
 
-- **Description:** This mode follows a more traditional approach where each client connection is handled by a dedicated worker thread. While simpler to understand, it can be less scalable than the NIO model under very high loads due to the overhead of managing many threads.
+- **Description:** This mode adopts a traditional model where each client connection is processed by a dedicated worker thread. Although conceptually simpler, it may be less scalable than the NIO model under extremely high loads due to the overhead associated with managing a large number of threads.
 - **To run:** Set the system property `-Dserver.type=threaded`.
 
 ## Configuration
 
-The server's behavior can be configured through properties files and system properties.
+The server's behavior is configurable via properties files and Java system properties.
 
 ### Properties Files
 
-- **`src/main/resources/server.properties`**: This file can be used to store server-specific configurations. *(Note: Based on current codebase analysis, this file's usage isn't explicitly detailed in `ServerConfig.java` but is a common convention. The README will reflect its potential use).*
-    - `server.port` (Example, actual property might differ or be in `ServerConfig.java`): Defines the port for the server.
-    - `ssl.enabled` (Example): To enable/disable SSL.
+- **`src/main/resources/server.properties`**: `ServerConfig.java` attempts to load configurations from this file first. If the file is not found, or if certain properties are missing, it falls back to default values defined within `ServerConfig.java`.
 - **`src/main/resources/log4j.properties`**: Configures the logging behavior for the application using Log4j.
 
 ### Key Configuration Options (from `com.jun.config.ServerConfig.java`)
 
-The primary way to configure the server at runtime for fundamental settings like port numbers and SSL is via constants defined in `ServerConfig.java`, which are then used by the `Server.java` main class.
+The following are the *default* values, as defined in `ServerConfig.java`, used if not overridden by settings in `src/main/resources/server.properties`.
 
 - **Server Type:**
     - System Property: `server.type`
     - Values: `nio` (default), `threaded`
-    - Class Constant: `ServerConfig.SERVER_TYPE_PROPERTY_KEY`
+    - Default Value: `nio` (controlled by `ServerConfig.DEFAULT_SERVER_TYPE`)
 - **NIO Server Port:**
-    - Port: `8080`
+    - Default Port: `8080`
+    - Config Property: `nio.server.port`
     - Class Constant: `ServerConfig.NIO_SERVER_PORT`
 - **Threaded Server Port:**
-    - Port: `8081`
+    - Default Port: `8080`
+    - Config Property: `threaded.server.port`
     - Class Constant: `ServerConfig.THREADED_SERVER_PORT`
 - **NIO Server SSL Enabled:**
-    - Value: `true` (can be changed in `ServerConfig.java`)
+    - Default Value: `false`
+    - Config Property: `nio.server.ssl.enabled`
     - Class Constant: `ServerConfig.NIO_SERVER_SSL_ENABLED`
-    - Keystore: `src/main/resources/server.jks` (password: `password`)
-    - Truststore: `src/main/resources/trustedCerts.jks` (password: `password`)
+    - Keystore (if SSL enabled): `./src/main/resources/server.jks` (password is defined in `ServerConfig.java` or can be overridden in `server.properties`)
+    - Truststore (if SSL enabled): `./src/main/resources/trustedCerts.jks` (password is defined in `ServerConfig.java` or can be overridden in `server.properties`)
 
-To change these settings (e.g., port numbers, SSL enablement directly), you would typically modify the constants in `ServerConfig.java` and recompile the project.
+To customize these settings:
+1.  **Recommended:** Modify or create `src/main/resources/server.properties` with the desired key-value pairs (e.g., `nio.server.port=8081`, `nio.server.ssl.enabled=true`).
+2.  **For development/testing:** Alter the default values directly in `ServerConfig.java` and recompile the project.
 
 ## Building and Running
 
@@ -70,38 +73,46 @@ To change these settings (e.g., port numbers, SSL enablement directly), you woul
     *(Replace `<repository-url>` with the actual URL of this repository.)*
 
 2.  **Compile the project and create the JAR:**
-    Use Maven to build the project. Navigate to the root directory of the project (where `pom.xml` is located) and run:
+    Use Maven to build the project. Navigate to the project's root directory (containing `pom.xml`) and execute:
     ```bash
     mvn clean package
     ```
-    This command will compile the source code, run tests (if not excluded), and package the application into a JAR file in the `target/` directory (e.g., `target/simpleNioServer-0.1-SNAPSHOT.jar`).
+    This command compiles the source code, runs tests (unless skipped), and packages the application into a JAR file. The JAR is typically found in the `target/` directory (e.g., `target/simpleNioServer-0.1-SNAPSHOT.jar`).
 
 ### Running
 
 Once the project is built, you can run the server from the command line.
 
 1.  **Navigate to the project's root directory.**
-2.  **Run the server using the `java -jar` command, specifying the server type with a system property.**
+2.  **Run the server using `java -jar`, optionally specifying the server type.**
 
-    **To run the NIO Server (default, on port 8080, SSL enabled by default):**
+    **To run the NIO Server (default mode, HTTP on port 8080 by default):**
     ```bash
-    java -Dserver.type=nio -jar target/simpleNioServer-0.1-SNAPSHOT.jar
+    java -jar target/simpleNioServer-0.1-SNAPSHOT.jar
     ```
-    Or, since NIO is the default:
+    *(This uses the default `server.type=nio`, `nio.server.port=8080`, and `nio.server.ssl.enabled=false` unless overridden in `server.properties` or `ServerConfig.java`.)*
+
+    **To run the NIO Server with SSL enabled (HTTPS):**
+    Ensure `nio.server.ssl.enabled=true` is set (e.g., in `server.properties`). The port might also be configured to a different value (e.g., 8443).
     ```bash
     java -jar target/simpleNioServer-0.1-SNAPSHOT.jar
     ```
 
-    **To run the Threaded Server (on port 8081):**
+    **To run the Threaded Server (HTTP on port 8080 by default):**
     ```bash
     java -Dserver.type=threaded -jar target/simpleNioServer-0.1-SNAPSHOT.jar
     ```
+    *(This uses `threaded.server.port=8080` unless overridden in `server.properties` or `ServerConfig.java`.)*
 
-    You should see log messages indicating that the server has started. You can then access it via a web browser or a tool like `curl` (e.g., `curl http://localhost:8081` for the threaded server or `curl https://localhost:8080` for the NIO server if SSL is enabled and correctly configured). Remember that the NIO server has SSL enabled by default, so you'll need to use `https://` and potentially accept a self-signed certificate.
+    After starting, you'll see log messages. Access the server using a browser or `curl`:
+    - Default NIO (HTTP): `curl http://localhost:8080`
+    - Default Threaded (HTTP): `curl http://localhost:8080`
+    - NIO with SSL (HTTPS, e.g., on port 8443 if configured): `curl https://localhost:8443`
+      *(For self-signed certificates, `curl` may require the `-k` or `--insecure` option.)*
 
 ## Project Structure
 
-The project follows a standard Maven directory layout. Key components are organized into the following packages under `src/main/java/com/jun/`:
+The project follows a standard Maven directory layout. Key components under `src/main/java/com/jun/` include:
 
 ```
 simpleNioServer/
@@ -112,50 +123,26 @@ simpleNioServer/
 │   │   ├── java/
 │   │   │   └── com/
 │   │   │       └── jun/
-│   │   │           ├── Server.java           # Main entry point to start the server
+│   │   │           ├── Server.java           # Main entry point
 │   │   │           ├── config/
-│   │   │           │   └── ServerConfig.java # Server configuration constants (ports, SSL)
-│   │   │           ├── http/
-│   │   │           │   ├── HttpRequestHandler.java # Handles HTTP request parsing (likely)
-│   │   │           │   └── NioMessageHandler.java  # Message handling for NIO
-│   │   │           ├── nioServer/              # NIO (Non-blocking I/O) server implementation
-│   │   │           │   ├── Acceptor.java       # Accepts incoming connections
-│   │   │           │   ├── ConnectedSocket.java # Represents a connected client socket
-│   │   │           │   ├── IOReactor.java      # Handles I/O operations for connected sockets
-│   │   │           │   ├── NIOHttpService.java # Main class for the NIO HTTP service
-│   │   │           │   ├── handler/            # Handlers for different I/O events (read, write)
-│   │   │           │   ├── msg/                # Message queue and processing components
-│   │   │           │   ├── ssl/                # SSL/TLS related utilities
-│   │   │           │   └── utility/            # Utility classes for the NIO server
-│   │   │           └── threadedServer/         # Threaded server implementation
-│   │   │               ├── SimpleThreadedHttpRequestHandler.java # Request handler for threaded server
-│   │   │               ├── ThreadedServer.java # Main class for the threaded server
-│   │   │               └── Worker.java         # Worker thread for handling client connections
+│   │   │           │   └── ServerConfig.java # Server configuration loader and defaults
+│   │   │           ├── http/                 # HTTP specific handlers
+│   │   │           ├── nioServer/            # NIO server implementation
+│   │   │           └── threadedServer/       # Threaded server implementation
 │   │   ├── resources/
 │   │   │   ├── log4j.properties      # Log4j configuration
-│   │   │   ├── server.jks            # Keystore for SSL (NIO server)
-│   │   │   ├── server.properties     # General server properties (if used)
+│   │   │   ├── server.jks            # Keystore for SSL
+│   │   │   ├── server.properties     # Optional server properties override
 │   │   │   └── trustedCerts.jks      # Truststore for SSL
 │   └── test/
-│       ├── java/                     # Unit tests
-│       └── resources/                # Test resources (e.g., test.properties)
 └── target/                         # Compiled code and packaged JAR
 ```
 
--   **`com.jun.Server`**: The main class that launches either the NIO or Threaded server based on system properties.
--   **`com.jun.config`**: Contains `ServerConfig.java` which centralizes configuration constants like port numbers and SSL settings.
--   **`com.jun.http`**: Contains classes related to HTTP message handling. `HttpRequestHandler` likely deals with parsing and processing HTTP requests. `NioMessageHandler` seems specific to message processing within the NIO server.
--   **`com.jun.nioServer`**: This package and its sub-packages implement the Non-blocking I/O server.
-    -   `Acceptor`: Listens for new client connections.
-    -   `IOReactor`: Manages I/O operations (read/write) for established connections, distributing work likely to handlers.
-    -   `NIOHttpService`: Orchestrates the NIO server setup.
-    -   `handler`: Contains specific handlers for socket read and write events.
-    -   `msg`: Appears to manage message queues and potentially message parsing/writing logic.
-    -   `ssl`: SSL context and engine management for HTTPS.
--   **`com.jun.threadedServer`**: This package implements the traditional Threaded server.
-    -   `ThreadedServer`: Manages the lifecycle of the threaded server.
-    -   `Worker`: Represents a thread that handles a single client connection.
-    -   `SimpleThreadedHttpRequestHandler`: Processes HTTP requests within a worker thread.
+-   **`com.jun.Server`**: Main entry point; launches NIO or Threaded server based on the `server.type` system property.
+-   **`com.jun.config.ServerConfig`**: Centralizes configuration defaults (ports, SSL) and loads from `server.properties`.
+-   **`com.jun.http`**: Classes for HTTP message handling.
+-   **`com.jun.nioServer`**: Implements the Non-blocking I/O server, including `Acceptor`, `IOReactor`, and SSL handling.
+-   **`com.jun.threadedServer`**: Implements the traditional Threaded server with `Worker` threads.
 -   **`src/main/resources`**: Contains configuration files, SSL keystores, and truststores.
 
 ## Contributing
@@ -165,11 +152,13 @@ Contributions are welcome! If you find any issues or have suggestions for improv
 1.  **Report an Issue:** Open an issue in the project's issue tracker, providing as much detail as possible.
 2.  **Submit a Pull Request:**
     *   Fork the repository.
-    *   Create a new branch for your feature or bug fix (`git checkout -b feature/your-feature-name` or `bugfix/issue-description`).
+    *   Create a new branch for your feature or bug fix.
     *   Make your changes and commit them with clear messages.
-    *   Push your changes to your fork (`git push origin feature/your-feature-name`).
-    *   Open a pull request against the main repository, describing the changes you've made.
+    *   Push your changes to your fork.
+    *   Open a pull request against the main repository, describing your changes.
 
 ## License
 
-This project is currently not licensed. Please refer to the repository owner for licensing information. *(Self-correction: Noticed no LICENSE file was listed by `ls()`, so adding a placeholder)*
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+The MIT License is a permissive free software license originating at the Massachusetts Institute of Technology (MIT). It puts very limited restriction on reuse and has, therefore, high license compatibility.
