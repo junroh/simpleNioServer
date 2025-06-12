@@ -36,7 +36,7 @@ public class Acceptor extends Thread {
     private Selector selector;
 
     public Acceptor(String address, int serverPort, boolean isSSL) throws Exception {
-        InetAddress bindAddress = InetAddress.getByName(ServerConfig.NIO_ACCEPTOR_ADDRESS);
+        InetAddress bindAddress = InetAddress.getByName(address);
         try {
             socketId = 0;
             serverSocketChannel = ServerSocketChannel.open();

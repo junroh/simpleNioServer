@@ -11,6 +11,14 @@ import java.util.List;
 public class HttpMessageReader implements IMessageReader {
 
     private static final Logger log = Logger.getLogger(HttpMessageReader.class);
+    // TODO: This reader processes buffers available in a single `parse` call.
+    // It does not maintain state for incomplete headers across multiple `parse` invocations.
+    // For truly robust handling of headers split across network packets arriving in
+    // different selector cycles, a more stateful parsing mechanism (e.g., storing
+    // partial Message state in ConnectedSocket or a dedicated buffer map) would be needed.
+    // The current `// todo: how to handle remaining message (partial msg)` in MsgHandler
+    // is related to this. For now, this handles cases where headers are split within
+    // the current batch of buffers.
     public HttpMessageReader() {
 
     }
