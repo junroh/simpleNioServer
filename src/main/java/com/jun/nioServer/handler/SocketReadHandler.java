@@ -41,10 +41,9 @@ public class SocketReadHandler implements Runnable {
                 }
                 totBytes += readbytes;
             } while (readbytes > 0);
-            // check socket closed
             if (!socket.isClosed()) {
                 listener.onComplete(totBytes, socketDatas);
-                socket.addInterestedOps(SelectionKey.OP_READ);   // enable read
+                socket.addInterestedOps(SelectionKey.OP_READ);
             }
         } catch (IOException e) {
             listener.onException(e);
@@ -64,7 +63,7 @@ public class SocketReadHandler implements Runnable {
             }
             totalBytesRead += bytesRead;
         }while(readByteBuffer.hasRemaining());
-        // todo reach to end of stream -> connection is closed already
+        // TODO: Verify if additional actions are needed when EOS is reached (currently calls socket.close()).
         if(bytesRead == -1) {
             socket.close();
         }

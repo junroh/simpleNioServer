@@ -90,10 +90,6 @@ public class ServerConfigTest {
     private void setStaticField(String fieldName, Object value) throws Exception {
         Field field = ServerConfig.class.getDeclaredField(fieldName);
         field.setAccessible(true);
-        // Remove final modifier if present (though ServerConfig fields are not final anymore)
-        Field modifiersField = Field.class.getDeclaredField("modifiers");
-        modifiersField.setAccessible(true);
-        modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL); // Should not be necessary now
         field.set(null, value);
     }
 

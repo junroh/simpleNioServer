@@ -13,12 +13,11 @@ public class Message {
     private static final Logger log = Logger.getLogger(Message.class);
     private static final AtomicInteger staticId = new AtomicInteger();
 
-    public ConnectedSocket socketChannel;
+    private final ConnectedSocket socketChannel;
     private SelectionKey key;
 
     private final List<byte[]> datas;
     private Object header;
-    private Object footer;
     private int lastidx;
     private int lastofst;
     private final int id;
@@ -34,6 +33,8 @@ public class Message {
         datas = new LinkedList<>();
         id = orgId;
     }
+
+    public ConnectedSocket getSocketChannel() { return socketChannel; }
 
     public int getId() {
         return id;

@@ -1,18 +1,18 @@
 package com.jun.nioServer;
 
-import com.jun.config.ServerConfig; // Added import
+import com.jun.config.ServerConfig;
 import org.apache.log4j.Logger;
 
-import javax.net.ssl.KeyManager; // Added import
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager; // Added import
-import java.io.IOException; // Added import
-import java.net.InetSocketAddress; // Added import
-import java.nio.channels.Selector; // Added import
-import java.nio.channels.ServerSocketChannel; // Added import
-import java.util.concurrent.ExecutorService; // Added import
-import java.util.concurrent.Executors; // Added import
-import java.util.concurrent.TimeUnit; // Added import
+import javax.net.ssl.TrustManager;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class NioServerService {
 
@@ -42,7 +42,7 @@ public class NioServerService {
     private IAcceptor acceptorInstance;
     private Thread acceptorThread; // Existing field
 
-    public NioServerService(ServerConfig config) { // Assuming direct access to ServerConfig static fields for setup
+    public NioServerService(ServerConfig config) {
         this.port = ServerConfig.NIO_SERVER_PORT;
         this.hostAddress = ServerConfig.NIO_ACCEPTOR_ADDRESS;
         this.isSslEnabled = ServerConfig.NIO_SERVER_SSL_ENABLED;
@@ -139,12 +139,6 @@ public class NioServerService {
         );
         log.info("Acceptor initialized: " + this.acceptorInstance.getClass().getName());
     }
-
-
-    // start(), stop(), waitStop() will be refactored in next step to use these internal methods.
-    // For now, keeping existing start() as a placeholder to ensure class compiles,
-    // though it uses the old acceptorInstance injection logic.
-    // The old constructor will be removed by the new config-based one.
 
     public void start() throws Exception {
         log.info("NioServerService.start() called.");

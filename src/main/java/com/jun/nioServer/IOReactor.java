@@ -21,8 +21,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 
-// socketchannel - always writable. readable is set when data is on channel.
-// important thing to set writable is writable data is ready. Then clear bit if sending data completes
 public class IOReactor implements Runnable {
 
     private static final Logger log = Logger.getLogger(IOReactor.class);
@@ -81,9 +79,6 @@ public class IOReactor implements Runnable {
                 log.trace("wait-on");
                 selector.select(1);
                 log.trace("wait-off");
-                // todo: think different way - one selector with accept + read + write
-                // https://blog.genuine.com/2013/07/nio-based-reactor/
-                // http://gee.cs.oswego.edu/dl/cpjslides/nio.pdf
                 Set<SelectionKey> selected = selector.selectedKeys();
                 for (SelectionKey key : selected) {
                     ConnectedSocket socket = (ConnectedSocket) (key.attachment());

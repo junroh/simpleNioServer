@@ -19,9 +19,6 @@ public class HttpMessageReader implements IMessageReader {
     // The current `// todo: how to handle remaining message (partial msg)` in MsgHandler
     // is related to this. For now, this handles cases where headers are split within
     // the current batch of buffers.
-    public HttpMessageReader() {
-
-    }
 
     @Override
     public int parse(ConnectedSocket socket, List<ByteBuffer> buffers) {

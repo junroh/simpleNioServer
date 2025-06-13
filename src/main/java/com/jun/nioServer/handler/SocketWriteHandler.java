@@ -44,8 +44,7 @@ public class SocketWriteHandler implements Runnable {
                 }
             }
             if(!readyBuffers.isEmpty()) {
-                // we have remaining data to be written
-                socket.addInterestedOps(SelectionKey.OP_WRITE);   // enable write
+                socket.addInterestedOps(SelectionKey.OP_WRITE);
                 socket.getKey().selector().wakeup();
             }
             listener.onComplete(totWrite, null);

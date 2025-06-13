@@ -3,7 +3,11 @@ package com.jun.nioServer;
 import com.jun.config.ServerConfig;
 import org.apache.log4j.Logger;
 
-import javax.net.ssl.*;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,8 +34,7 @@ public class Acceptor extends Thread implements IAcceptor {
     private Selector selector; // Used only in non-blocking mode
     private volatile boolean running = true;
 
-    // private final AtomicInteger currentIOReactorIndex = new AtomicInteger(0); // Old
-    private int currentIOReactorIndex = 0; // New
+    private int currentIOReactorIndex = 0;
     private final AtomicInteger socketIdCounter = new AtomicInteger(0);
 
     public Acceptor(ServerSocketChannel serverSocketChannel,
