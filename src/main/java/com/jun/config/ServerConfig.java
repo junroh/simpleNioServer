@@ -32,6 +32,8 @@ public class ServerConfig {
     public static int NIO_ACCEPTOR_NUM_WRITER_THREADS;
     /** Whether the Acceptor's main socket channel is in blocking mode (true) or non-blocking mode (false). */
     public static boolean NIO_ACCEPTOR_IS_BLOCKING;
+    /** Whether client sockets accepted by the NIO Acceptor should be in blocking mode (true) or non-blocking mode (false). */
+    public static boolean CLIENT_SOCKET_BLOCKING_MODE;
 
     // SSL Configuration (Common for NIO server if SSL is enabled)
     /** Path to the SSL keystore file (e.g., JKS). */
@@ -93,6 +95,7 @@ public class ServerConfig {
         NIO_ACCEPTOR_NUM_READER_THREADS = getIntProperty(props, "nio.acceptor.num.reader.threads", 2);
         NIO_ACCEPTOR_NUM_WRITER_THREADS = getIntProperty(props, "nio.acceptor.num.writer.threads", 2);
         NIO_ACCEPTOR_IS_BLOCKING = getBooleanProperty(props, "nio.acceptor.is.blocking", true);
+        CLIENT_SOCKET_BLOCKING_MODE = getBooleanProperty(props, "client.socket.blocking.mode", false); // Default to non-blocking for client sockets
 
         SSL_KEYSTORE_PATH = props.getProperty("ssl.keystore.path", "./src/main/resources/server.jks");
         SSL_KEYSTORE_PASSWORD = props.getProperty("ssl.keystore.password", "storepass");
@@ -124,6 +127,7 @@ public class ServerConfig {
         NIO_ACCEPTOR_NUM_READER_THREADS = 2;
         NIO_ACCEPTOR_NUM_WRITER_THREADS = 2;
         NIO_ACCEPTOR_IS_BLOCKING = true;
+        CLIENT_SOCKET_BLOCKING_MODE = false; // Default to non-blocking for client sockets
 
         SSL_KEYSTORE_PATH = "./src/main/resources/server.jks";
         SSL_KEYSTORE_PASSWORD = "storepass";

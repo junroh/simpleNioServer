@@ -16,11 +16,7 @@
                     <source>8</source>
                     <target>8</target>
                     <testExcludes>
-                        <exclude>**/HttpUtilTest.java</exclude>
-                        <exclude>**/NIOHttpServiceTest.java</exclude>
-                        <exclude>**/ThreadedServerTest.java</exclude>
-                        <exclude>**/SocketReadHandlerTest.java</exclude>
-                        <exclude>**/SocketWriteHandlerTest.java</exclude>
+                        <!-- All excludes previously here should be removed -->
                     </testExcludes>
                 </configuration>
             </plugin>
@@ -29,10 +25,17 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.2</version> <!-- Added a common version -->
                 <configuration>
+                    <!-- Required for Mockito 1.x to work with Java 9+ module system (JPMS) reflection restrictions -->
+                    <argLine>
+                        --add-opens=java.base/java.lang=ALL-UNNAMED
+                        --add-opens=java.base/java.util=ALL-UNNAMED
+                        --add-opens=java.base/java.nio=ALL-UNNAMED
+                        --add-opens=java.base/java.nio.channels=ALL-UNNAMED
+                        --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+                        --add-opens=java.base/javax.net.ssl=ALL-UNNAMED
+                    </argLine>
                     <excludes>
-                        <exclude>**/HttpUtilTest.java</exclude>
-                        <exclude>**/NIOHttpServiceTest.java</exclude>
-                        <exclude>**/ThreadedServerTest.java</exclude>
+                        <!-- All excludes previously here should be removed -->
                     </excludes>
                 </configuration>
             </plugin>
