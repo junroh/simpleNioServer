@@ -1,17 +1,15 @@
 package com.jun.nioServer.handler;
 
-// import com.jun.config.ServerConfig; // Unused
 import com.jun.http.NioMessageHandler;
 import com.jun.nioServer.ConnectedSocket;
 import com.jun.nioServer.msg.IMessageReader;
 import com.jun.nioServer.msg.Message;
-import com.jun.nioServer.msg.IMessageReaderFactory; // Added for constructor
+import com.jun.nioServer.msg.IMessageReaderFactory;
 import com.jun.nioServer.msg.http.HttpMessageReaderFactory;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-// import java.nio.channels.SelectionKey; // Unused
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -20,7 +18,7 @@ public class MsgHandler implements Runnable {
 
     private static final Logger log = Logger.getLogger(MsgHandler.class);
     private static final BlockingQueue<ConnectedSocket> readyToMsgQ = new LinkedBlockingQueue<>();
-    private IMessageReader msgParser; // Will be initialized via factory in constructor
+    private IMessageReader msgParser;
     private final Thread thread;
     private final IMessageReaderFactory messageReaderFactory;
     private final NioMessageHandler messageProcessor;
@@ -53,31 +51,30 @@ public class MsgHandler implements Runnable {
     public void run() {
         log.info("Message handler started");
         while(!Thread.currentThread().isInterrupted()) {
-            ConnectedSocket socket = null; // Initialize to null
+            ConnectedSocket socket = null;
             try {
                 socket = readyToMsgQ.take();
-                if (socket != null) { // Ensure socket is not null before processing
+                if (socket != null) {
                     processSocketInternal(socket);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.info("MsgHandler interrupted, stopping.");
             } catch (Exception e) {
-                log.error("Exception in MsgHandler run loop", e); // General error
+                log.error("Exception in MsgHandler run loop", e);
                 if (socket != null) {
                     log.error("Exception occurred while processing socket: " + socket.getSocketId() + ". Closing socket.", e);
-                    socket.close(); // Close the specific socket that caused trouble
+                    socket.close();
                 }
             }
         }
         log.info("Message handler stopped");
     }
 
-    // New method
     void processSocketInternal(ConnectedSocket socket) { // Removed throws IOException as internal methods handle them
         try {
             List<ByteBuffer> socketReadData = socket.getSocketReadData();
-            if (socketReadData == null) { // Defensive check
+            if (socketReadData == null) {
                  log.warn("socketReadData is null for socket: " + socket.getSocketId());
                  return;
             }

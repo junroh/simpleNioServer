@@ -16,19 +16,15 @@ public class SimpleThreadedHttpRequestHandler implements HttpRequestHandler {
         // which means a single backslash n in the actual output.
         // For direct HTTP, it should be \r\n for newlines.
         // However, to match original behavior first, I will use \n.
-        // This will be addressed in a later step if general HTTP compliance is tightened.
+        // TODO: Address HTTP compliance for line endings (use \r\n instead of \n).
         String response = "HTTP/1.1 200 OK\n\nWorkerRunnable: " +
                           serverText + " - " +
                           time;
         outputStream.write(response.getBytes("UTF-8"));
-        // inputStream.close(); // Original Worker closed input stream here.
-        // outputStream.close(); // Original Worker closed output stream here.
         log.debug("Response sent by SimpleThreadedHttpRequestHandler: " + time + " for serverText: " + serverText);
-        // The original Worker.java reads from the input stream and closes it.
-        // The provided code for SimpleThreadedHttpRequestHandler does not read from input stream.
-        // To maintain original behavior, the input stream should be read (even if data is discarded)
-        // and then closed if the handler is responsible for stream lifecycle.
-        // For now, let's assume the Worker will handle stream closing.
+        // The Worker.java is expected to manage the socket and stream lifecycle (closing them).
+        // This handler consumes the input stream data to mimic original behavior before the Worker closes the socket.
+        // TODO: Clarify and confirm stream lifecycle management responsibilities between handler and Worker.
         // Reading from input stream:
         byte[] buffer = new byte[1024];
         while (inputStream.read(buffer) != -1) {

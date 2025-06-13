@@ -29,7 +29,7 @@ public class Worker implements Runnable{
             input  = clientSocket.getInputStream();
             output = clientSocket.getOutputStream();
 
-            this.requestHandler.handle(input, output, this.serverText); // Call the handler
+            this.requestHandler.handle(input, output, this.serverText);
 
         } catch (IOException e) {
             log.error("Error processing client request for socket: " + clientSocket, e);

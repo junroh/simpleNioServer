@@ -2,23 +2,10 @@ package com.jun;
 
 import com.jun.config.ServerConfig;
 import com.jun.nioServer.NioServerService;
-// IAcceptor, Acceptor, IOReactor, Selector, KeyManager, SSLContext, TrustManager,
-// InetSocketAddress, ServerSocketChannel, ExecutorService, Executors, TimeUnit, IOException
-// will likely become unused and can be removed after refactoring startNioServerFlow.
 import com.jun.threadedServer.ThreadedServer;
 import org.apache.log4j.Logger;
 
-// Keep only necessary imports after refactoring
-import java.io.IOException; // May still be needed for some top-level exception handling or other methods if any
-// import java.nio.channels.Selector; // Likely unused directly in Server.java
-// import javax.net.ssl.KeyManager; // Likely unused
-// import javax.net.ssl.SSLContext; // Likely unused
-// import javax.net.ssl.TrustManager; // Likely unused
-// import java.net.InetSocketAddress; // Likely unused
-// import java.nio.channels.ServerSocketChannel; // Likely unused
-// import java.util.concurrent.ExecutorService; // Likely unused
-// import java.util.concurrent.Executors; // Likely unused
-// import java.util.concurrent.TimeUnit; // Likely unused
+import java.io.IOException;
 
 
 public class Server {
@@ -71,18 +58,8 @@ public class Server {
             // Ensure stop is called if service was started but waitStop was interrupted or start threw after some resources acquired.
             // NioServerService.stop() is designed to be safe to call even if start didn't complete.
             if (nioService != null) { // Should always be true unless constructor failed.
-                 // log.info("Ensuring NioServerService is stopped in finally block."); // Optional logging
-                 // nioService.stop(); // stop() is now called by NioServerService itself in its finally block of start() or by waitStop() completion.
-                                  // Also, if waitStop() completes normally, stop() would have been called.
-                                  // If waitStop() is interrupted, the main thread might exit, but NioServerService's
-                                  // own shutdown sequence (if start was successful) should proceed.
-                                  // The primary shutdown orchestration is now within NioServerService.
             }
         }
         log.info("NioServerService flow has concluded.");
     }
-
-    // All NIO helper methods (createSslContext, createAndStartIoReactors, createConAcceptorExecutorService,
-    // createServerSocketChannel, createAcceptor, runNioHttpService/runNioServerService, shutdownNioResources)
-    // are now removed as their logic has been moved into NioServerService.java.
 }

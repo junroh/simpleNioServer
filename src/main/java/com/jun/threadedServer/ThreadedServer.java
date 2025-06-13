@@ -58,7 +58,7 @@ public class ThreadedServer implements Runnable{
         server.join();
     }
 
-    public synchronized boolean isStopped() { // Changed from private to public
+    public synchronized boolean isStopped() {
         return isStopped;
     }
 

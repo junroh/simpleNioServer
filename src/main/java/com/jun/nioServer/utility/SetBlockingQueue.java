@@ -21,7 +21,7 @@ public class SetBlockingQueue<T> extends LinkedBlockingQueue<T> {
         return true;
     }
 
-    // todo: this is not thread safe with offer
+    // TODO: This method is not synchronized, while 'offer' is. Review for thread-safety implications regarding the atomicity of queue and set operations across 'offer' and 'take'.
     @Override
     public T take() throws InterruptedException {
         T t = super.take();

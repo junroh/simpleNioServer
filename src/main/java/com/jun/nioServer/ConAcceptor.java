@@ -4,7 +4,6 @@ import org.apache.log4j.Logger;
 import javax.net.ssl.SSLContext;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
-// No longer need AtomicInteger import
 
 class ConAcceptor implements Runnable {
     private static final Logger log = Logger.getLogger(ConAcceptor.class);

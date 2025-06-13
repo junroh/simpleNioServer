@@ -46,7 +46,6 @@ public class SimpleNioMessageHandler implements NioMessageHandler {
         log.debug("Processing socket: " + connectedSocket.getSocketId() + " - " + requestMessage.getId());
         Message response = new Message(connectedSocket, requestMessage.getId());
 
-        // Write header then body
         response.writeToMessage(httpResponseHeaderBytes);
         response.writeToMessage(responseBodyBytes);
 
@@ -54,10 +53,8 @@ public class SimpleNioMessageHandler implements NioMessageHandler {
 
         if(connectedSocket.prepareBuffersForWriting()) {
             log.debug("Response message is ready on socket " + connectedSocket.getSocketId());
-            // Check if key is valid before operating on it
             if (connectedSocket.getKey() != null && connectedSocket.getKey().isValid()) {
                 connectedSocket.addInterestedOps(SelectionKey.OP_WRITE);
-                // Check if selector is open before waking it up
                 if (connectedSocket.getKey().selector() != null && connectedSocket.getKey().selector().isOpen()) {
                     connectedSocket.getKey().selector().wakeup();
                 } else {

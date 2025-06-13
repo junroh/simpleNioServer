@@ -52,6 +52,7 @@ public class SSLEngineBuffer {
     private SSLEngineResult.HandshakeStatus doTasks () {
         Runnable runnable;
         while ((runnable = sslEngine.getDelegatedTask())!=null) {
+            // TODO: Consider using a cached thread pool for delegated tasks instead of creating a new thread each time.
             new Thread(runnable).start();
         }
         return sslEngine.getHandshakeStatus();
