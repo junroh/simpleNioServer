@@ -49,12 +49,12 @@ public class IOReactor implements Runnable {
         this.thread = new Thread(this, this.getClass().getSimpleName());
     }
 
-    void startThread() {
+    public void startThread() {
         msgHandler.start();
         thread.start();
     }
 
-    void stopThread() {
+    public void stopThread() {
         log.info("Stopping Request MsgProcessor");
         readerPool.shutdown();
         msgHandler.stop();

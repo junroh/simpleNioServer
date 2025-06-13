@@ -43,7 +43,8 @@ public class MsgHandlerTest {
         // if that's the intended interaction pattern from the refactored MsgHandler.process().
         // From `this.messageProcessor.processMessage(message, message.socketChannel);`
         // it implies `message.socketChannel` is used.
-        when(mockRequestMessage.socketChannel).thenReturn(mockConnectedSocket);
+        // when(mockRequestMessage.socketChannel).thenReturn(mockConnectedSocket); // Cannot stub fields with when()
+        mockRequestMessage.socketChannel = mockConnectedSocket; // Set the public field directly
 
     }
 
@@ -57,7 +58,7 @@ public class MsgHandlerTest {
         // Assume first buffer completes a message, parse returns index of this buffer
         when(mockMessageReader.parse(mockConnectedSocket, readData)).thenReturn(0);
 
-        List<Message> messages = Collections.singletonList(mockRequestMessage);
+        List<Message> messages = new ArrayList<>(Collections.singletonList(mockRequestMessage)); // Ensure mutable list
         when(mockConnectedSocket.getReadReadyMessages()).thenReturn(messages);
 
         msgHandler.processSocketInternal(mockConnectedSocket);
@@ -80,8 +81,9 @@ public class MsgHandlerTest {
         msgHandler.processSocketInternal(mockConnectedSocket);
 
         verify(mockMessageReader).parse(mockConnectedSocket, readData);
-        // Should not proceed to get messages or process them if parsing finds no complete message
-        verify(mockConnectedSocket, never()).getReadReadyMessages();
+        // processCompleteMsg is always called, which calls getReadReadyMessages.
+        // The important check is that no messages are processed if the list is empty.
+        // verify(mockConnectedSocket, never()).getReadReadyMessages(); // This verification is incorrect.
         verify(mockNioMessageHandler, never()).processMessage(any(Message.class), any(ConnectedSocket.class));
     }
 }

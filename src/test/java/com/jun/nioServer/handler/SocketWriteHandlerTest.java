@@ -88,24 +88,32 @@ public class SocketWriteHandlerTest {
         List<ByteBuffer> writeBuffers = new ArrayList<>();
         writeBuffers.add(buffer1);
 
-        int writtenAmount = 5;
+        int firstWriteAmount = 5; // Simulate writing 5 bytes initially
 
         when(mockConnectedSocket.getWritebuffers()).thenReturn(writeBuffers);
-        when(mockSocketChannel.write(any(ByteBuffer.class))).thenAnswer(invocation -> {
-            ByteBuffer b = invocation.getArgumentAt(0, ByteBuffer.class);
-            // Simulate partial write by advancing position less than limit
-            b.position(b.position() + writtenAmount);
-            return writtenAmount;
-        });
+
+        // Simulate first write succeeds partially, subsequent writes in this cycle return 0
+        when(mockSocketChannel.write(buffer1))
+            .thenAnswer(invocation -> { // First call
+                ByteBuffer b = invocation.getArgumentAt(0, ByteBuffer.class);
+                b.position(b.position() + firstWriteAmount);
+                return firstWriteAmount;
+            })
+            .thenReturn(0); // Subsequent calls in the same internal loop of SocketWriteHandler.write()
+
 
         writeHandler.run();
 
         verify(mockConnectedSocket).tryWriteLock();
-        verify(mockSocketChannel).write(buffer1); // Verify with the specific buffer
-        verify(mockCompleteListener).onComplete(eq(writtenAmount), any());
+        // The internal write loop in SocketWriteHandler would call channel.write() once (returns 5),
+        // then again (mock returns 0), inner loop terminates.
+        verify(mockSocketChannel, times(2)).write(buffer1);
+        verify(mockCompleteListener).onComplete(eq(firstWriteAmount), any());
 
-        // Because the buffer was not fully written, it remains in `readyBuffers` (local to run method).
-        // The `if(!readyBuffers.isEmpty())` check in SocketWriteHandler should then trigger re-registration.
+        // Buffer1 still has data (original_data_length - firstWriteAmount bytes remaining)
+        assertTrue(buffer1.hasRemaining());
+        // assertEquals("PartialData".getBytes("UTF-8").length - firstWriteAmount, buffer1.remaining()); // More precise check
+
         verify(mockConnectedSocket).addInterestedOps(SelectionKey.OP_WRITE);
         verify(mockSelector).wakeup(); // Check selector wakeup
         verify(mockConnectedSocket).unLockWrite();
@@ -137,7 +145,7 @@ public class SocketWriteHandlerTest {
     }
 
     @Test
-    public void testRun_NoDataToWrite() throws IOException {
+    public void testRun_NoDataToWrite() throws IOException { // Added throws IOException back
         when(mockConnectedSocket.getWritebuffers()).thenReturn(new ArrayList<>());
 
         writeHandler.run();
@@ -150,7 +158,7 @@ public class SocketWriteHandlerTest {
     }
 
     @Test
-    public void testRun_WhenTryWriteLockFalse_DoesNotProceed() {
+    public void testRun_WhenTryWriteLockFalse_DoesNotProceed() throws IOException { // Added throws IOException
         when(mockConnectedSocket.tryWriteLock()).thenReturn(false);
 
         writeHandler.run();

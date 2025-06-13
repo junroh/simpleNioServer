@@ -25,6 +25,72 @@ public class HttpUtil {
         int endOfFirstLine = findNextLineBreak(src, startIndex, endIndex);
         if(endOfFirstLine == -1) return -1;
 
+        resolveHttpMethod(src, startIndex, httpHeaders); // Call this to set httpHeaders.httpMethod
+        if (httpHeaders.httpMethod == 0) { // If no valid method was found, it's a bad request line
+            log.warn("No valid HTTP method found in request line.");
+            return -1;
+        }
+
+        // More robust request line parsing: Method URI Version
+        int methodEndIndex = startIndex;
+        if (httpHeaders.httpMethod == HttpHeaders.HTTP_METHOD_GET) methodEndIndex += GET.length;
+        else if (httpHeaders.httpMethod == HttpHeaders.HTTP_METHOD_POST) methodEndIndex += POST.length;
+        else if (httpHeaders.httpMethod == HttpHeaders.HTTP_METHOD_PUT) methodEndIndex += PUT.length;
+        else if (httpHeaders.httpMethod == HttpHeaders.HTTP_METHOD_HEAD) methodEndIndex += HEAD.length;
+        else if (httpHeaders.httpMethod == HttpHeaders.HTTP_METHOD_DELETE) methodEndIndex += DELETE.length;
+
+        // Find space after method
+        int uriStartIndex = -1;
+        // endOfFirstLine points to \n, request line content ends at endOfFirstLine - 2 (char before \r)
+        // However, loop conditions should use < endOfFirstLine -1 or similar to avoid \r
+        int requestLineContentEnd = endOfFirstLine - 1; // The character before \r
+
+        if (methodEndIndex < requestLineContentEnd && src[methodEndIndex] == ' ') {
+            uriStartIndex = methodEndIndex + 1;
+        } else {
+            log.warn("Request line: Malformed - Missing space after method or method length incorrect. MethodEnd: " + methodEndIndex + " ReqLineEnd: " + requestLineContentEnd);
+            return -1; // Malformed: no space after method
+        }
+
+        // Find space after URI (this is where version would start)
+        int versionStartIndex = -1;
+        boolean foundUriEnd = false;
+        for (int i = uriStartIndex; i < requestLineContentEnd; i++) {
+            if (src[i] == ' ') {
+                if (i == uriStartIndex) { // URI is empty, e.g., "GET  HTTP/1.1"
+                    log.warn("Request line: Malformed - URI part is empty.");
+                    return -1;
+                }
+                versionStartIndex = i + 1;
+                foundUriEnd = true;
+                break;
+            }
+        }
+
+        if (!foundUriEnd) { // No space found after URI, implies version is missing
+            log.warn("Request line: Malformed - No space found after URI, version is missing.");
+            return -1;
+        }
+
+        if (versionStartIndex >= requestLineContentEnd) { // Space was the last char before \r, so version is empty, e.g. "GET / \r\n"
+            log.warn("Request line: Malformed - HTTP version part is empty.");
+            return -1;
+        }
+
+        // Minimal check for version starting with HTTP/
+        final byte[] HTTP_SLASH = {'H', 'T', 'T', 'P', '/'};
+        // Check if enough characters are present for "HTTP/X.Y" (at least HTTP/1.0 which is 8 chars)
+        // (requestLineContentEnd - versionStartIndex) is the length of the version part
+        if ((requestLineContentEnd - versionStartIndex) < "HTTP/1.0".length() ||
+            !matches(src, versionStartIndex, HTTP_SLASH)) {
+            try {
+                log.warn("Request line: Malformed - HTTP version does not start with 'HTTP/' or is too short. Actual: " + new String(src, versionStartIndex, requestLineContentEnd - versionStartIndex, "UTF-8"));
+            } catch (UnsupportedEncodingException e) {
+                log.warn("Request line: Malformed - HTTP version does not start with 'HTTP/' or is too short. (Unable to log actual string)");
+            }
+            return -1;
+        }
+        // Further validation for HTTP/X.Y can be added here if needed.
 
         //parse HTTP headers
         int prevEndOfHeader = endOfFirstLine + 1;

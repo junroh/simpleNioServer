@@ -1,210 +1,185 @@
 package com.jun.nioServer;
 
 import com.jun.config.ServerConfig;
-import com.jun.nioServer.utility.NamedThreadFactory;
 import org.apache.log4j.Logger;
 
 import javax.net.ssl.*;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.security.KeyStore;
-import java.security.SecureRandom;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * The Acceptor thread is responsible for accepting incoming client connections.
- * It can operate in two modes for connection acceptance, configured by
- * {@link ServerConfig#NIO_ACCEPTOR_IS_BLOCKING}:
- * 1. Blocking mode: Uses traditional {@code ServerSocketChannel.accept()} in a loop.
- *    Each accepted connection is then handled by a {@code ConAcceptor} task submitted
- *    to an ExecutorService.
- * 2. Non-blocking mode: Configures the ServerSocketChannel for non-blocking mode and
- *    uses a Selector to detect OP_ACCEPT events. Accepted connections are handled similarly.
- *
- * Accepted connections (SocketChannel) are then registered with one of the IOReactor threads
- * for further I/O processing (read/write).
- */
-public class Acceptor extends Thread {
+public class Acceptor extends Thread implements IAcceptor {
 
     private static final Logger log = Logger.getLogger(Acceptor.class);
 
-    private final ExecutorService conAcceptorExecutor;
+    private final ServerSocketChannel serverSocketChannel; // Injected
+    private final ExecutorService conAcceptorExecutor;   // Injected
+    private final IOReactor[] ioReactors;                // Injected
+    private final SSLContext sslContext;                 // Injected (can be null)
+    private final boolean isNonBlocking;
+    private final String localAddressString;
 
-    private ServerSocketChannel serverSocketChannel;
-    private SSLContext sslContext;
+    private Selector selector; // Used only in non-blocking mode
+    private volatile boolean running = true;
 
-    private IOReactor[] ioReactors;
-    private int socketId;
+    // private final AtomicInteger currentIOReactorIndex = new AtomicInteger(0); // Old
+    private int currentIOReactorIndex = 0; // New
+    private final AtomicInteger socketIdCounter = new AtomicInteger(0);
 
-    private Selector selector;
+    public Acceptor(ServerSocketChannel serverSocketChannel,
+                      ExecutorService conAcceptorExecutor,
+                      IOReactor[] ioReactors,
+                      SSLContext sslContext, // Can be null for non-SSL
+                      boolean isNonBlocking) throws IOException {
+        this.serverSocketChannel = serverSocketChannel;
+        this.conAcceptorExecutor = conAcceptorExecutor;
+        this.ioReactors = ioReactors;
+        this.sslContext = sslContext; // May be null
+        this.isNonBlocking = isNonBlocking;
 
-    public Acceptor(String address, int serverPort, boolean isSSL) throws Exception {
-        InetAddress bindAddress = InetAddress.getByName(address);
-        try {
-            socketId = 0;
-            serverSocketChannel = ServerSocketChannel.open();
-            serverSocketChannel.bind(new InetSocketAddress(bindAddress, serverPort), ServerConfig.NIO_ACCEPTOR_BACKLOG);
-
-            if (isSSL) {
-                sslContext = SSLContext.getInstance("TLS");
-                sslContext.init(
-                    createKeyManagers(ServerConfig.SSL_KEYSTORE_PATH, ServerConfig.SSL_KEYSTORE_PASSWORD, ServerConfig.SSL_KEY_PASSWORD),
-                    createTrustManagers(ServerConfig.SSL_TRUSTSTORE_PATH, ServerConfig.SSL_TRUSTSTORE_PASSWORD),
-                    new SecureRandom());
-            }
-
-            if(!ServerConfig.NIO_ACCEPTOR_IS_BLOCKING) {
-                setNonBlockingMode();
-            }
-            startIOReactor();
-            log.info(String.format("Successfully bound to %s:%d", bindAddress.toString(), serverPort));
-
-        } catch(UnknownHostException e) {
-            log.error("Unknown host address " + bindAddress.toString());
-        } catch (IOException e) {
-            log.error("binding error on " + bindAddress.toString() + ":"+ serverPort);
+        if (this.ioReactors == null || this.ioReactors.length == 0) {
+            throw new IllegalArgumentException("IOReactors array cannot be null or empty.");
         }
-        setName(this.getClass().getSimpleName());
-        conAcceptorExecutor = Executors.newFixedThreadPool(ServerConfig.NIO_ACCEPTOR_NUM_IOREACTOR);
+        if (this.conAcceptorExecutor == null) {
+            throw new IllegalArgumentException("ExecutorService for ConAcceptor cannot be null.");
+        }
+        if (this.serverSocketChannel == null) {
+            throw new IllegalArgumentException("ServerSocketChannel cannot be null.");
+        }
+
+        if (isNonBlocking) {
+            this.serverSocketChannel.configureBlocking(false);
+            this.selector = Selector.open();
+            this.serverSocketChannel.register(this.selector, SelectionKey.OP_ACCEPT);
+        }
+        this.localAddressString = serverSocketChannel.getLocalAddress().toString(); // Cache local address
+
+        setName(getClass().getSimpleName() + "-" + this.localAddressString);
+        log.info(String.format("Acceptor initialized for %s. Non-blocking: %s", this.localAddressString, isNonBlocking));
     }
 
-    void stopThread() {
-        try {
-            log.info("Stopping acceptor");
-            if(ioReactors!=null) {
-                for(IOReactor ioReactor: ioReactors) {
-                    ioReactor.stopThread();
-                }
+    @Override
+    public void stopThread() {
+        log.info("Stopping Acceptor for " + this.localAddressString);
+        running = false;
+
+        if (selector != null && selector.isOpen()) {
+            log.debug("Waking up and closing selector for " + this.localAddressString);
+            selector.wakeup();
+            try {
+                selector.close();
+                log.info("Selector closed for " + this.localAddressString);
+            } catch (IOException e) {
+                log.error("IOException while closing selector in Acceptor for " + this.localAddressString, e);
             }
-            interrupt();
-            serverSocketChannel.close();
-            while(isAlive()) {}
-            log.info("Stopped acceptor completely");
-        } catch (IOException e) {
-            log.error("Error on closing server " + e.toString());
+        } else {
+            log.debug("Selector already null or closed for " + this.localAddressString);
         }
+        log.info("Acceptor stopThread() called for " + this.localAddressString + ". Flag 'running' set to false and selector woken up/closed if applicable.");
     }
 
     @Override
     public void run() {
-        log.info("Started acceptor");
-        while(!Thread.currentThread().isInterrupted()){
+        log.info("Acceptor started for " + this.localAddressString);
+        while (running && !Thread.currentThread().isInterrupted()) {
+            SocketChannel clientSocket = null; // Moved out to be accessible for the common processing block
             try {
-                if(ServerConfig.NIO_ACCEPTOR_IS_BLOCKING) {
-                    SocketChannel socketChannel = serverSocketChannel.accept();
-                    conAcceptorExecutor.submit(new ConAcceptor(socketChannel));
-                } else {
-                    selector.select();
-                    Set<SelectionKey> selected = selector.selectedKeys();
-                    for (SelectionKey key : selected) {
-                        if(key.isAcceptable()) {
-                            Runnable r = (Runnable) (key.attachment());
-                            if (r != null) {
-                                conAcceptorExecutor.submit(r);
+                if (isNonBlocking) {
+                    int selectedCount = selector.select(); // Blocking call
+                    if (Thread.currentThread().isInterrupted()) { // Check interrupt status after select()
+                        log.warn("Acceptor thread interrupted in non-blocking select loop (after select).");
+                        running = false; // Ensure loop termination
+                        break;
+                    }
+                    if (!running) { // Check running status after select()
+                        break;
+                    }
+                    // Selected count can be 0 if selector was woken up by stopThread() -> selector.wakeup()
+                    // and running became false. In this case, clientSocket remains null and loop should exit.
+                    if (selectedCount > 0) {
+                        Set<SelectionKey> selectedKeys = selector.selectedKeys();
+                        for (SelectionKey key : selectedKeys) {
+                            if (key.isValid() && key.isAcceptable()) {
+                                clientSocket = serverSocketChannel.accept();
+                                if (clientSocket != null) {
+                                    // Common processing logic will handle this clientSocket
+                                    break; // Process one accepted socket per select() iteration
+                                }
                             }
                         }
+                        selectedKeys.clear();
                     }
-                    selected.clear();
+                } else { // Blocking mode
+                    clientSocket = serverSocketChannel.accept(); // Blocking call
+                    if (Thread.currentThread().isInterrupted()) { // Check interrupt status after accept()
+                         log.warn("Acceptor thread interrupted in blocking accept loop (after accept).");
+                         running = false; // Ensure loop termination
+                         if(clientSocket != null) try { clientSocket.close(); } catch (IOException e) { log.error("Error closing client socket after interrupt", e); }
+                         break;
+                    }
                 }
-            } catch(IOException e){
-                log.error("IOException in Acceptor run loop", e);
-            }
-        }
-        conAcceptorExecutor.shutdown();
-        log.info("Stopped acceptor");
-    }
 
-    private void setNonBlockingMode() throws  IOException {
-        selector = Selector.open();
-        serverSocketChannel.configureBlocking(false);
-        SelectionKey sk = serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
-        sk.attach(new ConAcceptor(null));
-    }
+                if (clientSocket != null) {
+                    clientSocket.configureBlocking(ServerConfig.CLIENT_SOCKET_BLOCKING_MODE);
 
-    private void startIOReactor() throws IOException {
-        ExecutorService readerPool =
-            Executors.newFixedThreadPool(ServerConfig.NIO_ACCEPTOR_NUM_READER_THREADS, new NamedThreadFactory("Reader"));
-        ExecutorService writerPool =
-            Executors.newFixedThreadPool(ServerConfig.NIO_ACCEPTOR_NUM_WRITER_THREADS, new NamedThreadFactory("Writer"));
-        ioReactors = new IOReactor[ServerConfig.NIO_ACCEPTOR_NUM_IOREACTOR];
-        for(int i=0;i< ioReactors.length; i++) {
-            ioReactors[i] = new IOReactor(null, readerPool, writerPool);
-            ioReactors[i].startThread();
-        }
-    }
+                    int nextSocketId = socketIdCounter.getAndIncrement();
+                    IOReactor targetIoReactor = ioReactors[currentIOReactorIndex];
+                    currentIOReactorIndex = (currentIOReactorIndex + 1) % ioReactors.length;
 
-    private KeyManager[] createKeyManagers(String filepath, String keystorePassword,
-                                                 String keyPassword) {
-        try {
-            KeyStore keyStore = KeyStore.getInstance("JKS");
-            try (InputStream keyStoreIS = new FileInputStream(filepath)) {
-                keyStore.load(keyStoreIS, keystorePassword.toCharArray());
-            }
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            kmf.init(keyStore, keyPassword.toCharArray());
-            return kmf.getKeyManagers();
-        } catch (Exception e) {
-            log.error("Failed to create Key Manager" + e);
-            return new KeyManager[0];
-        }
-    }
-
-    private TrustManager[] createTrustManagers(String filepath, String keystorePassword) {
-        try {
-            KeyStore trustStore = KeyStore.getInstance("JKS");
-            try (InputStream trustStoreIS = new FileInputStream(filepath)) {
-                trustStore.load(trustStoreIS, keystorePassword.toCharArray());
-            }
-            TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            trustFactory.init(trustStore);
-            return trustFactory.getTrustManagers();
-        } catch (Exception e) {
-            log.error("Failed to create Trust Manager" + e);
-            return new TrustManager[0];
-        }
-    }
-
-    private class ConAcceptor implements Runnable {
-        private SocketChannel socketChannel;
-        private int currentIOReactorIdx;
-
-        ConAcceptor(SocketChannel socketChannel) {
-            this.socketChannel = socketChannel;
-            currentIOReactorIdx = 0;
-        }
-
-        public void run() {
-            try {
-                if(socketChannel==null) {
-                    socketChannel = serverSocketChannel.accept();
+                    log.debug("Accepted connection for socket ID " + nextSocketId + ", routing to IOReactor " + currentIOReactorIndex);
+                    // Assuming ConAcceptor constructor will be: ConAcceptor(SocketChannel, IOReactor, SSLContext, int)
+                    conAcceptorExecutor.submit(new ConAcceptor(clientSocket, targetIoReactor, sslContext, nextSocketId));
                 }
-                regSocket(socketChannel);
-            } catch (IOException ignore) {
-                // Ignored, possibly due to server shutdown or channel closed before accept completed.
-                // Specific exceptions during accept() under normal operation are handled in the main run loop.
-            }
-        }
 
-        private void regSocket(SocketChannel socketChannel) throws IOException {
-            try {
-                ioReactors[currentIOReactorIdx].
-                    regNewSocket(socketChannel, socketId++, sslContext);
-                currentIOReactorIdx = (currentIOReactorIdx+1)/ioReactors.length;
+            } catch (java.nio.channels.ClosedByInterruptException e) {
+                log.warn("Acceptor thread interrupted (ClosedByInterruptException) in run loop for " + this.localAddressString + ". Shutting down.", e);
+                running = false;
+            } catch (java.nio.channels.AsynchronousCloseException e) {
+                log.warn("ServerSocketChannel closed asynchronously (AsynchronousCloseException) in Acceptor run loop for " + this.localAddressString + ". Shutting down.", e);
+                running = false;
+            } catch (java.nio.channels.ClosedChannelException e) {
+                log.warn("Channel closed (ClosedChannelException) in Acceptor run loop for " + this.localAddressString + ". Shutting down.", e);
+                running = false;
+            } catch (IOException e) {
+                if (!running || (selector != null && !selector.isOpen()) || !serverSocketChannel.isOpen()) {
+                     log.warn("Acceptor for " + this.localAddressString + " shutting down or channel/selector closed: " + e.getMessage());
+                } else {
+                    log.error("IOException in Acceptor run loop for " + this.localAddressString, e);
+                }
             } catch (Exception e) {
-                log.error("Failed to register new socket. " +
-                    "Connection is going to be dropped due to " + e.getLocalizedMessage());
-                socketChannel.close();
+                if (running) {
+                    log.error("Unexpected exception in Acceptor run loop for " + this.localAddressString, e);
+                }
             }
         }
+        log.info("Acceptor thread finished for " + this.localAddressString);
+    }
+
+    public static KeyManager[] createKeyManagers(String filepath, String keystorePassword, String keyPassword) throws Exception {
+        KeyStore keyStore = KeyStore.getInstance("JKS");
+        try (InputStream keyStoreIS = new FileInputStream(filepath)) {
+            keyStore.load(keyStoreIS, keystorePassword.toCharArray());
+        }
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(keyStore, keyPassword.toCharArray());
+        return kmf.getKeyManagers();
+    }
+
+    public static TrustManager[] createTrustManagers(String filepath, String keystorePassword) throws Exception {
+        KeyStore trustStore = KeyStore.getInstance("JKS");
+        try (InputStream trustStoreIS = new FileInputStream(filepath)) {
+            trustStore.load(trustStoreIS, keystorePassword.toCharArray());
+        }
+        TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        trustFactory.init(trustStore);
+        return trustFactory.getTrustManagers();
     }
 }
