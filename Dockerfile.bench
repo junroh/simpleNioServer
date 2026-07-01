@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1
+#
+# Load-generator image — builds wrk2 (the rate-based fork of wrk) for honest
+# coordinated-omission-corrected latency stats.
+
+FROM debian:bookworm-slim AS build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        git \
+        libssl-dev \
+        zlib1g-dev \
+        unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+RUN git clone --depth=1 https://github.com/giltene/wrk2.git . && make -j
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libssl3 \
+        zlib1g \
+        curl \
+        iproute2 \
+        procps \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /src/wrk /usr/local/bin/wrk2
+WORKDIR /work
+
+# wrk2 binary takes the same args as wrk plus -R <rate>:
+#   wrk2 -t<threads> -c<conns> -d<duration> -R<rate> --latency http://server:8080/hello
+ENTRYPOINT ["wrk2"]

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Log4j2 configuration. Without this file log4j-core defaults to ERROR-only
+  console output, hiding every log.info() / log.warn() in the codebase.
+
+  status="WARN" controls log4j's own internal logging (config parse errors etc.).
+  The Root logger level (INFO) controls application logging.
+-->
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

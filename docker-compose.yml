@@ -1,0 +1,62 @@
+# docker-compose for the NIO/Threaded/Virtual benchmark.
+#
+# The server runs in one container with a pinned resource envelope so results
+# are reproducible. The load generator runs in a separate container on the same
+# bridge network so the network path is short (no real RTT, no real packet
+# loss — measure only what is in scope per docs/BENCHMARK.md §9).
+#
+# Drive a single scenario with `scripts/bench.sh`; drive the full E1..E7
+# matrix with `scripts/run-matrix.sh`. Both scripts use this compose file as
+# the substrate.
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bench-server:latest
+    container_name: bench-server
+    networks:
+      - bench
+    ports:
+      - "8080:8080"
+    cpus: 2.0
+    mem_limit: 512m
+    memswap_limit: 512m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      SERVER_TYPE: ${SERVER_TYPE:-nio}
+      SLEEP_MS: ${SLEEP_MS:-0}
+      NUM_REACTORS: ${NUM_REACTORS:-2}
+      POOL_SIZE: ${POOL_SIZE:-100}
+      BACKLOG: ${BACKLOG:-128}
+      SSL_ENABLED: ${SSL_ENABLED:-false}
+      HEAP: ${HEAP:-256m}
+      ASYNC_DISPATCH: ${ASYNC_DISPATCH:-false}
+      ASYNC_DISPATCH_EXECUTOR: ${ASYNC_DISPATCH_EXECUTOR:-fixed:500}
+
+  bench:
+    build:
+      context: .
+      dockerfile: Dockerfile.bench
+    image: bench-load:latest
+    container_name: bench-load
+    networks:
+      - bench
+    depends_on:
+      - server
+    cpus: 2.0
+    mem_limit: 512m
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    # Args supplied at runtime by scripts/bench.sh via `docker compose run bench ...`
+    # Default entrypoint is wrk2 (see Dockerfile.bench).
+
+networks:
+  bench:
+    driver: bridge
