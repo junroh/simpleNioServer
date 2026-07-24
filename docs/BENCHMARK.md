@@ -450,6 +450,30 @@ scripts/bench.sh \
     --rate 21000 --path /sleep --reps 3 --out-dir results/raw
 ```
 
+### Allocation profiling (where do the bytes come from?)
+
+Before any GC-reduction work, profile *where* the allocations are, rather than
+guessing. `scripts/profile-alloc.sh` runs one scenario under load with a JFR
+recording (`settings=profile`, so allocation sites are sampled) and — if a JDK
+`jfr` tool is on the host — renders the top allocators:
+
+```bash
+scripts/profile-alloc.sh --transport nio --c 100 --rate 20000 --duration 60
+# → results/alloc/alloc-nio/{alloc.jfr, alloc-views.txt, server.log, wrk2.txt}
+
+# Analyse an existing recording by hand (JDK 21):
+jfr view allocation-by-site  results/alloc/alloc-nio/alloc.jfr
+jfr view allocation-by-class results/alloc/alloc-nio/alloc.jfr
+jfr view gc                  results/alloc/alloc-nio/alloc.jfr
+```
+
+This perturbs throughput (JFR + sampling overhead), so it is **not** a
+latency/throughput measurement — use it only for allocation attribution. It
+works via the image's `EXTRA_JAVA_OPTS` passthrough, so the normal benchmark
+runs above are unaffected. Compare transports by re-running with
+`--transport threaded|nio-async|virtual` and a distinct `--exp-id`.
+
+
 ### Dry run
 
 ```bash

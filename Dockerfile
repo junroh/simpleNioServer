@@ -40,18 +40,23 @@ ENV SERVER_TYPE=nio \
     SSL_ENABLED=false \
     HEAP=256m \
     ASYNC_DISPATCH=false \
-    ASYNC_DISPATCH_EXECUTOR=fixed:500
+    ASYNC_DISPATCH_EXECUTOR=fixed:500 \
+    EXTRA_JAVA_OPTS=""
 
 # JVM flags pinned for reproducible benchmark runs:
 #   * fixed heap (no resize noise)
 #   * G1 GC (consistent baseline)
 #   * tracePinnedThreads=full (Layer-5 metric for the Virtual transport)
 #   * GC log to stderr for parsing by collect-server-metrics.sh
+#   * EXTRA_JAVA_OPTS — passthrough for one-off runs (e.g. JFR allocation
+#     profiling via scripts/profile-alloc.sh); empty by default so normal
+#     benchmark runs are unaffected.
 ENTRYPOINT ["/bin/sh","-lc","exec java \
     -Xms${HEAP} -Xmx${HEAP} \
     -XX:+UseG1GC \
     -Xlog:gc=info::time \
     -Djdk.tracePinnedThreads=full \
+    ${EXTRA_JAVA_OPTS} \
     -Dserver.type=${SERVER_TYPE} \
     -Dserver.address=0.0.0.0 \
     -Dserver.backlog=${BACKLOG} \

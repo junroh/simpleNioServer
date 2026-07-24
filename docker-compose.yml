@@ -37,6 +37,7 @@ services:
       HEAP: ${HEAP:-256m}
       ASYNC_DISPATCH: ${ASYNC_DISPATCH:-false}
       ASYNC_DISPATCH_EXECUTOR: ${ASYNC_DISPATCH_EXECUTOR:-fixed:500}
+      EXTRA_JAVA_OPTS: ${EXTRA_JAVA_OPTS:-}
 
   bench:
     build:
