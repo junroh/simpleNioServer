@@ -19,4 +19,4 @@ How the docs fit together:
 | [0001](0001-seda-nio-testbed.md) | A SEDA-style NIO server as a C10K testbed | Accepted (retroactive) |
 | [0002](0002-virtual-thread-transport.md) | Add a virtual-thread transport to test whether Loom obsoletes NIO | Accepted |
 | [0003](0003-task-queue-reactor.md) | Single-threaded selector via a reactor task queue | Accepted |
-| [0004](0004-handoff-boundaries.md) | Restrict hand-offs to blocking and parallelism boundaries | Proposed |
+| [0004](0004-handoff-boundaries.md) | Restrict hand-offs to blocking and parallelism boundaries | Accepted (Tier 0) |

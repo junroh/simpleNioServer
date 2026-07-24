@@ -25,8 +25,7 @@ public class NioServerServiceTest {
                 .hostAddress("localhost")
                 .sslEnabled(false)
                 .numIoReactors(1)
-                .numReaderThreads(2)
-                .numWriterThreads(2)
+                .numIoThreads(4)
                 .acceptorBacklog(64)
                 .acceptorNonBlocking(false)
                 .build();

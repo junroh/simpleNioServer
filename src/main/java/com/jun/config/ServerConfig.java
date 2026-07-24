@@ -24,8 +24,7 @@ import java.util.Properties;
  *   threaded.server.pool.size       — Threaded transport pool size
  *
  *   nio.num.io.reactors             — IOReactor count
- *   nio.num.reader.threads          — reader pool size per reactor
- *   nio.num.writer.threads          — writer pool size per reactor
+ *   nio.num.io.threads              — I/O pool size per reactor
  *   nio.async.dispatch.enabled      — wrap MessageProcessor in AsyncMessageProcessor
  *   nio.async.dispatch.executor     — "virtual" | "fixed:&lt;N&gt;"
  *   nio.registrar.pool.size         — max concurrent connection registrations / SSL handshakes
@@ -54,8 +53,7 @@ public final class ServerConfig {
     public static final int    DEFAULT_SERVER_BACKLOG               = 1024;
     public static final int    DEFAULT_THREADED_POOL_SIZE           = 100;
     public static final int    DEFAULT_NIO_NUM_IO_REACTORS          = 1;
-    public static final int    DEFAULT_NIO_NUM_READER_THREADS       = 2;
-    public static final int    DEFAULT_NIO_NUM_WRITER_THREADS       = 2;
+    public static final int    DEFAULT_NIO_NUM_IO_THREADS           = 4;
     public static final boolean DEFAULT_NIO_ASYNC_DISPATCH_ENABLED  = false;
     public static final String DEFAULT_NIO_ASYNC_DISPATCH_EXECUTOR  = "fixed:500";
     public static final int    DEFAULT_NIO_REGISTRAR_POOL_SIZE      = 64;
@@ -76,8 +74,7 @@ public final class ServerConfig {
     private final int threadedServerPoolSize;
 
     private final int nioNumIoReactors;
-    private final int nioNumReaderThreads;
-    private final int nioNumWriterThreads;
+    private final int nioNumIoThreads;
     private final boolean nioAsyncDispatchEnabled;
     private final String nioAsyncDispatchExecutor;
     private final int nioRegistrarPoolSize;
@@ -108,8 +105,7 @@ public final class ServerConfig {
         this.threadedServerPoolSize = getPositiveInt(props, "threaded.server.pool.size", DEFAULT_THREADED_POOL_SIZE);
 
         this.nioNumIoReactors = getPositiveInt(props, "nio.num.io.reactors", DEFAULT_NIO_NUM_IO_REACTORS);
-        this.nioNumReaderThreads = getPositiveInt(props, "nio.num.reader.threads", DEFAULT_NIO_NUM_READER_THREADS);
-        this.nioNumWriterThreads = getPositiveInt(props, "nio.num.writer.threads", DEFAULT_NIO_NUM_WRITER_THREADS);
+        this.nioNumIoThreads = getPositiveInt(props, "nio.num.io.threads", DEFAULT_NIO_NUM_IO_THREADS);
         this.nioAsyncDispatchEnabled = getBoolean(props, "nio.async.dispatch.enabled", DEFAULT_NIO_ASYNC_DISPATCH_ENABLED);
         this.nioAsyncDispatchExecutor = props.getProperty("nio.async.dispatch.executor", DEFAULT_NIO_ASYNC_DISPATCH_EXECUTOR);
         this.nioRegistrarPoolSize = getPositiveInt(props, "nio.registrar.pool.size", DEFAULT_NIO_REGISTRAR_POOL_SIZE);
@@ -167,12 +163,8 @@ public final class ServerConfig {
         return nioNumIoReactors;
     }
 
-    public int getNioNumReaderThreads() {
-        return nioNumReaderThreads;
-    }
-
-    public int getNioNumWriterThreads() {
-        return nioNumWriterThreads;
+    public int getNioNumIoThreads() {
+        return nioNumIoThreads;
     }
 
     public boolean isNioAsyncDispatchEnabled() {

@@ -32,7 +32,7 @@ trade-offs look like — backed by numbers, not opinion.
 | Aspect              | Threaded                          | NIO-Async                                                | Loom Threaded                            |
 | ------------------- | --------------------------------- | -------------------------------------------------------- | ---------------------------------------- |
 | Threads per conn    | 1 from a fixed pool (default 100) | 0 transport threads; handler uses 1 from a separate pool of 500 | 0 platform threads; 1 VT per conn |
-| Carrier OS threads  | poolSize (100)                    | 2 reactors + reader/writer pools + handler pool (500)    | `Runtime.availableProcessors()` (≈ 2)    |
+| Carrier OS threads  | poolSize (100)                    | 2 reactors + I/O pools + handler pool (500)              | `Runtime.availableProcessors()` (≈ 2)    |
 | Where blocking goes | worker thread (held until done)   | handler pool thread (held until done)                    | VT (carrier unmounts on block)           |
 | Handler runs on     | the connection's worker thread    | a thread from the fixed handler pool                     | the connection's virtual thread          |
 | Saturates when      | `c > poolSize`                    | `c > handlerPool` AND handlers block                     | carrier CPUs full or VT pinning          |
@@ -119,7 +119,7 @@ Common controls:
   `-Xms256m -Xmx256m`, `-Djdk.tracePinnedThreads=full`.
 - Load generator: wrk2, separate container, same host network.
 - Threaded pool size: 100. NIO `numIoReactors`: 2,
-  `numReaderThreads`: 4, `numWriterThreads`: 4.
+  `numIoThreads`: 8.
   Async dispatch executor: `fixed:500` (platform threads, no Loom).
   (These are pinned for the run matrix; the shipped defaults are smaller — see
   `server.properties`.)
@@ -318,7 +318,7 @@ computed for each so you can read comparisons without doing math.
 - Memory leaks (60 s is too short).
 - HTTP/2, WebSocket, pipelining.
 - Cold-start latency.
-- Tuning sweep over numIoReactors / numReaderThreads.
+- Tuning sweep over numIoReactors / numIoThreads.
 - `nio.async.dispatch.executor=fixed:<N>` variant (follow-up if Loom
   unavailable or pins).
 - Plain NIO (`nio.async.dispatch.enabled=false`). Supported by the code

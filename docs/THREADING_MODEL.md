@@ -32,7 +32,7 @@ count. 10 000 idle connections cost 10 000 file descriptors + heap, not
 This is the only reason the NIO transport exists. The constraint that
 follows from it:
 
-> Shared threads (reactor, dispatcher, reader/writer pools) never block on
+> Shared threads (reactor, dispatcher, I/O pool) never block on
 > something that hasn't happened yet.
 
 ## 2. Two kinds of waiting
@@ -47,7 +47,7 @@ to block. The architecture splits threads into two groups:
 
 **Latency-critical** — shared by many connections. One blocked latency-critical
 thread stalls every connection it serves. Reactor selector, dispatcher,
-reader/writer pools.
+I/O pool.
 
 **Work-absorbing** — owns one connection or one task at a time. One blocked
 work-absorbing thread stalls only that task. Registrar pool, async handler
@@ -64,16 +64,16 @@ are size-capped so the absorption itself can't grow without bound.
 | ---                    | ---                                         | ---                       | ---                                                   |
 | Acceptor               | 1                                           | latency-critical          | new connections stop being accepted                   |
 | Reactor selector       | `R` (default 1)                             | **latency-critical**      | every connection on that reactor stalls               |
-| Reader pool            | `R × nio.num.reader.threads` (default 1×2)  | latency-critical¹         | reads for other sockets on that reactor queue         |
-| Writer pool            | `R × nio.num.writer.threads` (default 1×2)  | latency-critical¹         | writes for other sockets on that reactor queue        |
+| I/O pool               | `R × nio.num.io.threads` (default 1×4)      | latency-critical¹         | reads/writes for other sockets on that reactor queue  |
 | Dispatcher             | `R` (one per reactor)                       | latency-critical          | all parsing/handling on that reactor stops            |
 | Registrar pool         | `nio.registrar.pool.size` (default 64)      | **work-absorbing**        | only that one connection's setup waits                |
 | Async handler pool     | optional, `fixed:N` (default 500) or virtual| **work-absorbing**        | only that one request waits                           |
 | SSL handshake watchdog | 1 (SSL only)                                | helper                    | — (only schedules timeouts)                           |
 
 ¹ In practice these never block — the underlying `read()`/`write()` is
-non-blocking — but the pools are *shared per reactor*, so blocking work is
-kept off them.
+non-blocking — but the pool is *shared per reactor*, so blocking work is
+kept off it. One pool serves both reads and writes: any idle worker takes
+whichever is ready.
 
 ## 4. Reactor: the thread that must not block
 
@@ -84,8 +84,8 @@ select()                     // park until at least one socket is ready
 runPendingTasks()            // run interest-op / register / cancel tasks
                              // other threads enqueued via reactor.execute(...)
 for each ready key:
-    OP_READ  → readerPool.submit(SocketReader)
-    OP_WRITE → writerPool.submit(SocketWriter)
+    OP_READ  → ioPool.submit(SocketReader)
+    OP_WRITE → ioPool.submit(SocketWriter)
 ```
 
 Only the reactor thread touches the selector or any `SelectionKey`. Other
@@ -103,15 +103,17 @@ inline would stall every connection on the reactor.
 
 The select-and-dispatch loop is one thread on one core. Past some
 connection count it saturates that core. `R` reactors split the connection
-set into `R` independent loops, each with its own selector, reader pool,
-writer pool, and dispatcher — no shared mutable state, so they scale
+set into `R` independent loops, each with its own selector, I/O pool, and
+dispatcher — no shared mutable state, so they scale
 without contention. Start with `R = 1`; raise only when one `IOReactor-*`
 thread is at ~100% CPU while others/cores sit idle.
 
-## 5. Reader and writer pools
+## 5. The I/O pool
 
 `SocketReader` / `SocketWriter` run the actual `socketChannel.read()` /
-`write()` on the per-reactor pool. Both are non-blocking — `read()` returns
+`write()` on the per-reactor I/O pool. One work-conserving pool
+serves both reads and writes, so any idle worker takes whichever job is
+ready ([ADR 0004](adr/0004-handoff-boundaries.md)). Both are non-blocking — `read()` returns
 whatever bytes are available right now (possibly zero) and returns
 immediately. The thread does a short burst and goes back to the pool.
 
@@ -185,20 +187,19 @@ confining all key access to the reactor and serializing its byte loops.
 ## 8. Sizing the pools
 
 Total thread count is a function of CPU cores and pool sizes — not of
-open connection count. For `R` reactors with `r` reader and `w` writer
+open connection count. For `R` reactors with an I/O pool of `io`
 threads each, async off, SSL on:
 
 ```
 1                 acceptor
 + R               reactor selectors
-+ R × r           reader workers
-+ R × w           writer workers
++ R × io          I/O workers
 + R               dispatchers
 + registrar_pool  (bounded; busy only during connection setup / handshake)
 + 1               handshake watchdog
 ```
 
-`R=4, r=2, w=2` is ~24 threads whether the server holds 100 or 100 000
+`R=4, io=4` is ~25 threads whether the server holds 100 or 100 000
 connections. Threads bounded by hardware, connections bounded by memory.
 
 ### Knobs
@@ -209,11 +210,12 @@ thread saturates a core under load. Ceiling: the cores you're willing to
 dedicate to I/O dispatch (`cores` or `cores/2`). More than that is idle
 select loops.
 
-**`nio.num.reader.threads` / `nio.num.writer.threads` (r, w)** — per
-reactor. Non-blocking, CPU-bound byte work (copy, and for SSL,
-encrypt/decrypt). Default **2** each. Increase only if reads/writes
-visibly queue behind a busy reactor *and* there are spare cores. Total is
-`R × r` and `R × w`, so scales with R.
+**`nio.num.io.threads` (io)** — size of the I/O pool per reactor. One
+work-conserving pool serves both reads and writes (any idle worker takes
+any job — [ADR 0004](adr/0004-handoff-boundaries.md)). Non-blocking,
+CPU-bound byte work (copy, and for SSL, encrypt/decrypt). Default **4**.
+Increase only if reads/writes visibly queue behind a busy reactor *and*
+there are spare cores. Total is `R × io`, so scales with R.
 
 **`nio.registrar.pool.size`** — caps concurrent in-flight handshakes.
 Work-absorbing — threads here block during TLS round-trips. Each parked

@@ -16,13 +16,12 @@ import com.jun.config.ServerConfig;
  * @param truststorePath        JKS of trusted CAs (mTLS-ready, unused for plain TLS)
  * @param truststorePassword    password for the truststore
  * @param numIoReactors         number of {@link IOReactor}s (each on its own thread)
- * @param numReaderThreads      reader pool size per reactor
- * @param numWriterThreads      writer pool size per reactor
+ * @param numIoThreads          I/O pool size per reactor
  * @param acceptorBacklog       OS accept-queue depth
  * @param acceptorNonBlocking   {@code ServerSocketChannel.configureBlocking()} inverse
  * @param clientSocketBlocking  blocking mode for accepted client sockets (almost always false for NIO)
  * @param maxBytesPerRead       soft cap on bytes pulled per dispatch; prevents a single chatty
- *                              connection from monopolising a reader-pool thread
+ *                              connection from monopolising an I/O-pool thread
  * @param registrarPoolSize     max concurrent connection registrations / SSL handshakes
  * @param registrarQueueCapacity registrar queue depth before new connections are rejected
  * @param sslHandshakeTimeoutMs watchdog deadline for a single SSL handshake (ms)
@@ -37,8 +36,7 @@ public record NioServerSettings(
         String truststorePath,
         String truststorePassword,
         int numIoReactors,
-        int numReaderThreads,
-        int numWriterThreads,
+        int numIoThreads,
         int acceptorBacklog,
         boolean acceptorNonBlocking,
         boolean clientSocketBlocking,
@@ -58,8 +56,7 @@ public record NioServerSettings(
                 .truststorePath(cfg.getSslTruststorePath())
                 .truststorePassword(cfg.getSslTruststorePassword())
                 .numIoReactors(cfg.getNioNumIoReactors())
-                .numReaderThreads(cfg.getNioNumReaderThreads())
-                .numWriterThreads(cfg.getNioNumWriterThreads())
+                .numIoThreads(cfg.getNioNumIoThreads())
                 .acceptorBacklog(cfg.getServerBacklog())
                 .registrarPoolSize(cfg.getNioRegistrarPoolSize())
                 .registrarQueueCapacity(cfg.getNioRegistrarQueueCapacity())
@@ -81,8 +78,7 @@ public record NioServerSettings(
         private String truststorePath;
         private String truststorePassword;
         private int numIoReactors = 1;
-        private int numReaderThreads = 2;
-        private int numWriterThreads = 2;
+        private int numIoThreads = 4;
         private int acceptorBacklog = 1024;
         private boolean acceptorNonBlocking = true;
         private boolean clientSocketBlocking = false;
@@ -100,8 +96,7 @@ public record NioServerSettings(
         public Builder truststorePath(String v)     { this.truststorePath = v;        return this; }
         public Builder truststorePassword(String v) { this.truststorePassword = v;    return this; }
         public Builder numIoReactors(int v)         { this.numIoReactors = v;         return this; }
-        public Builder numReaderThreads(int v)      { this.numReaderThreads = v;      return this; }
-        public Builder numWriterThreads(int v)      { this.numWriterThreads = v;      return this; }
+        public Builder numIoThreads(int v)          { this.numIoThreads = v;          return this; }
         public Builder acceptorBacklog(int v)       { this.acceptorBacklog = v;       return this; }
         public Builder acceptorNonBlocking(boolean v)  { this.acceptorNonBlocking = v;  return this; }
         public Builder clientSocketBlocking(boolean v) { this.clientSocketBlocking = v; return this; }
@@ -115,7 +110,7 @@ public record NioServerSettings(
                     port, hostAddress, sslEnabled,
                     keystorePath, keystorePassword, keyPassword,
                     truststorePath, truststorePassword,
-                    numIoReactors, numReaderThreads, numWriterThreads,
+                    numIoReactors, numIoThreads,
                     acceptorBacklog, acceptorNonBlocking, clientSocketBlocking,
                     maxBytesPerRead,
                     registrarPoolSize, registrarQueueCapacity, sslHandshakeTimeoutMs);

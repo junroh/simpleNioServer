@@ -28,8 +28,8 @@ import java.util.concurrent.ExecutorService;
  * Application work runs in {@link MessageDispatcher}, never on the selector thread.
  *
  * <p>Threading model (Netty {@code EventLoop} style): <b>only the reactor thread ever
- * touches the {@link Selector} or any {@link SelectionKey}.</b> Other threads (reader /
- * writer pools, dispatcher) never mutate interest ops directly; they submit a task via
+ * touches the {@link Selector} or any {@link SelectionKey}.</b> Other threads (the I/O
+ * pool, dispatcher) never mutate interest ops directly; they submit a task via
  * {@link #execute(Runnable)}, which the reactor drains once per loop in
  * {@link #runPendingTasks()}. The task queue—not {@code wakeup()}—carries the state, so a
  * coalesced or "early" wakeup can never drop an interest-op change: when the reactor wakes,
@@ -43,15 +43,13 @@ public class IOReactor implements Runnable {
     private final Queue<Runnable> taskQueue = new ConcurrentLinkedQueue<>();
     private final MessageDispatcher messageDispatcher;
     private final MessageReaderFactory readerFactory;
-    private final ExecutorService readerPool;
-    private final ExecutorService writerPool;
+    private final ExecutorService ioPool;
     private final int maxBytesPerRead;
 
     public IOReactor(Selector selector,
                      MessageDispatcher messageDispatcher,
                      MessageReaderFactory readerFactory,
-                     ExecutorService readerPool,
-                     ExecutorService writerPool,
+                     ExecutorService ioPool,
                      int maxBytesPerRead) {
         if (maxBytesPerRead <= 0) {
             throw new IllegalArgumentException("maxBytesPerRead must be positive");
@@ -59,12 +57,11 @@ public class IOReactor implements Runnable {
         this.selector = Objects.requireNonNull(selector, "selector");
         this.messageDispatcher = Objects.requireNonNull(messageDispatcher, "messageDispatcher");
         this.readerFactory = Objects.requireNonNull(readerFactory, "readerFactory");
-        this.readerPool = Objects.requireNonNull(readerPool, "readerPool");
-        this.writerPool = Objects.requireNonNull(writerPool, "writerPool");
+        this.ioPool = Objects.requireNonNull(ioPool, "ioPool");
         this.maxBytesPerRead = maxBytesPerRead;
     }
 
-    /** Grace + force window for reader/writer pool shutdown. Reader threads may be parked
+    /** Grace + force window for I/O pool shutdown. I/O threads may be parked
      *  in {@code SocketChannel.read()} on a dead client; if graceful shutdown does not
      *  empty the pool, {@code shutdownNow()} interrupts them (read closes the channel
      *  with {@code ClosedByInterruptException}). Without this, those non-daemon threads
@@ -73,8 +70,7 @@ public class IOReactor implements Runnable {
     private static final long IO_POOL_FORCE_TIMEOUT_S = 2L;
 
     public void stop() {
-        ExecutorShutdown.shutdown(readerPool, "readerPool", IO_POOL_GRACE_TIMEOUT_S, IO_POOL_FORCE_TIMEOUT_S);
-        ExecutorShutdown.shutdown(writerPool, "writerPool", IO_POOL_GRACE_TIMEOUT_S, IO_POOL_FORCE_TIMEOUT_S);
+        ExecutorShutdown.shutdown(ioPool, "ioPool", IO_POOL_GRACE_TIMEOUT_S, IO_POOL_FORCE_TIMEOUT_S);
     }
 
     /**
@@ -218,7 +214,7 @@ public class IOReactor implements Runnable {
                 conn.close();
             }
         };
-        readerPool.submit(new SocketReader(conn, callback, maxBytesPerRead));
+        ioPool.submit(new SocketReader(conn, callback, maxBytesPerRead));
     }
 
     private void onWrite(Connection conn) {
@@ -235,6 +231,6 @@ public class IOReactor implements Runnable {
                 conn.close();
             }
         };
-        writerPool.submit(new SocketWriter(conn, callback));
+        ioPool.submit(new SocketWriter(conn, callback));
     }
 }

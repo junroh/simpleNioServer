@@ -37,11 +37,14 @@ import java.util.concurrent.TimeUnit;
  *
  * <pre>
  *   NioAcceptor (1 thread) ─accept→ ConnectionRegistrar (executor) ─register→ IOReactor[i]
- *   IOReactor[i] (1 thread/reactor) ─OP_READ→  SocketReader  (readerPool)
- *                                   ─OP_WRITE→ SocketWriter  (writerPool)
+ *   IOReactor[i] (1 thread/reactor) ─OP_READ→  SocketReader  (I/O pool)
+ *                                   ─OP_WRITE→ SocketWriter  (I/O pool)
  *                                            ─parse→ MessageDispatcher (1/reactor)
  *                                                  ─dispatch→ MessageProcessor → response
  * </pre>
+ *
+ * <p>Each reactor has one work-conserving I/O pool that serves both reads and writes
+ * (ADR 0004): any idle worker takes whichever read or write is ready.
  *
  * <p>Protocol selection happens at construction time. The generic constructor takes a
  * {@link MessageReaderFactory} (bytes → Messages) and a {@link MessageProcessor}
@@ -205,10 +208,9 @@ public class NioServerService {
 
     private ReactorRunner buildAndStartReactor(int idx) throws IOException {
         Selector selector = Selector.open();
-        ExecutorService readerPool = Executors.newFixedThreadPool(
-                settings.numReaderThreads(), daemonFactory("IOReader-" + idx));
-        ExecutorService writerPool = Executors.newFixedThreadPool(
-                settings.numWriterThreads(), daemonFactory("IOWriter-" + idx));
+        // ADR 0004: one work-conserving I/O pool per reactor — any worker takes any read or write.
+        ExecutorService ioPool = Executors.newFixedThreadPool(
+                settings.numIoThreads(), daemonFactory("IO-" + idx));
 
         MessageDispatcher dispatcher = new MessageDispatcher(messageProcessor);
         Thread dispatcherThread = new Thread(dispatcher, "MessageDispatcher-" + idx);
@@ -216,7 +218,7 @@ public class NioServerService {
         dispatcherThread.start();
 
         IOReactor reactor = new IOReactor(selector, dispatcher, readerFactory,
-                readerPool, writerPool, settings.maxBytesPerRead());
+                ioPool, settings.maxBytesPerRead());
         Thread reactorThread = new Thread(reactor, "IOReactor-" + idx);
         reactorThread.setDaemon(false);
         reactorThread.start();

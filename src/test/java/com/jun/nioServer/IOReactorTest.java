@@ -27,16 +27,14 @@ public class IOReactorTest {
     private Selector selector;
     private MessageDispatcher messageDispatcher;
     private MessageReaderFactory readerFactory;
-    private ExecutorService readerPool;
-    private ExecutorService writerPool;
+    private ExecutorService ioPool;
 
     @Before
     public void setUp() throws Exception {
         selector = Selector.open();
         messageDispatcher = mock(MessageDispatcher.class);
         readerFactory = mock(MessageReaderFactory.class);
-        readerPool = mock(ExecutorService.class);
-        writerPool = mock(ExecutorService.class);
+        ioPool = mock(ExecutorService.class);
     }
 
     @After
@@ -48,49 +46,41 @@ public class IOReactorTest {
 
     @Test(expected = NullPointerException.class)
     public void constructor_rejectsNullSelector() {
-        new IOReactor(null, messageDispatcher, readerFactory, readerPool, writerPool, DEFAULT_READ_BUDGET);
+        new IOReactor(null, messageDispatcher, readerFactory, ioPool, DEFAULT_READ_BUDGET);
     }
 
     @Test(expected = NullPointerException.class)
     public void constructor_rejectsNullMessageDispatcher() {
-        new IOReactor(selector, null, readerFactory, readerPool, writerPool, DEFAULT_READ_BUDGET);
+        new IOReactor(selector, null, readerFactory, ioPool, DEFAULT_READ_BUDGET);
     }
 
     @Test(expected = NullPointerException.class)
     public void constructor_rejectsNullReaderFactory() {
-        new IOReactor(selector, messageDispatcher, null, readerPool, writerPool, DEFAULT_READ_BUDGET);
+        new IOReactor(selector, messageDispatcher, null, ioPool, DEFAULT_READ_BUDGET);
     }
 
-    @Test
-    public void constructor_rejectsNullPools() {
-        try {
-            new IOReactor(selector, messageDispatcher, readerFactory, null, writerPool, DEFAULT_READ_BUDGET);
-            fail("expected NullPointerException for null readerPool");
-        } catch (NullPointerException expected) { /* ok */ }
-        try {
-            new IOReactor(selector, messageDispatcher, readerFactory, readerPool, null, DEFAULT_READ_BUDGET);
-            fail("expected NullPointerException for null writerPool");
-        } catch (NullPointerException expected) { /* ok */ }
+    @Test(expected = NullPointerException.class)
+    public void constructor_rejectsNullPool() {
+        new IOReactor(selector, messageDispatcher, readerFactory, null, DEFAULT_READ_BUDGET);
     }
 
     @Test
     public void constructor_rejectsNonPositiveReadBudget() {
         try {
-            new IOReactor(selector, messageDispatcher, readerFactory, readerPool, writerPool, 0);
+            new IOReactor(selector, messageDispatcher, readerFactory, ioPool, 0);
             fail("expected IllegalArgumentException for zero budget");
         } catch (IllegalArgumentException expected) { /* ok */ }
         try {
-            new IOReactor(selector, messageDispatcher, readerFactory, readerPool, writerPool, -1);
+            new IOReactor(selector, messageDispatcher, readerFactory, ioPool, -1);
             fail("expected IllegalArgumentException for negative budget");
         } catch (IllegalArgumentException expected) { /* ok */ }
     }
 
     @Test
-    public void stop_shutsDownReaderAndWriterPools() {
+    public void stop_shutsDownIoPool() {
         IOReactor reactor = new IOReactor(selector, messageDispatcher, readerFactory,
-                readerPool, writerPool, DEFAULT_READ_BUDGET);
+                ioPool, DEFAULT_READ_BUDGET);
         reactor.stop();
-        verify(readerPool, times(1)).shutdown();
-        verify(writerPool, times(1)).shutdown();
+        verify(ioPool, times(1)).shutdown();
     }
 }

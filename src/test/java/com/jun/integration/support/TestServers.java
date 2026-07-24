@@ -45,8 +45,7 @@ public final class TestServers {
     public static final int ACCEPT_BACKLOG     = 128;
     public static final int THREADED_POOL_SIZE = 8;
     public static final int NIO_REACTORS       = 1;
-    public static final int NIO_READERS        = 2;
-    public static final int NIO_WRITERS        = 2;
+    public static final int NIO_IO_THREADS     = 4;
     public static final int NIO_ASYNC_POOL     = 8;
 
     public static final String HELLO_BODY_FORMAT = "<html><body>Hello World(%d-%d)</body></html>";
@@ -102,8 +101,7 @@ public final class TestServers {
                 .truststorePath(TRUSTSTORE_PATH)
                 .truststorePassword(KEYSTORE_PASSWORD)
                 .numIoReactors(NIO_REACTORS)
-                .numReaderThreads(NIO_READERS)
-                .numWriterThreads(NIO_WRITERS)
+                .numIoThreads(NIO_IO_THREADS)
                 .build();
         MessageProcessor processor = new HttpNioMessageHandler(handler);
         if (asyncDispatch) {

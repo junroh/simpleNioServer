@@ -1,6 +1,6 @@
 # 0004 — Restrict hand-offs to blocking and parallelism boundaries
 
-- **Status:** Proposed
+- **Status:** Accepted (Tier 0 implemented; Tier 1 deferred)
 - **Supersedes:** —
 - **Superseded by:** —
 - **Amends:** [0001](0001-seda-nio-testbed.md) — refines the SEDA pipeline; does not discard it
@@ -54,10 +54,17 @@ boundary. Apply it in two tiers.
 Tier 0 — merge the reader and writer pools (this change):
 
 - Replace the per-reactor reader pool and writer pool with one I/O pool per
-  reactor.
-- Keep the split available as an option for workloads where read and write loads
-  are very asymmetric, but default to merged.
-- This reduces one sizing knob and lets any I/O worker take any read or write job.
+  reactor, sized by `nio.num.io.threads` (default 4).
+- Do not keep the split as a configuration option. The finding above is that the
+  split buys no isolation worth having here, so a `nio.io.pool.split` toggle would
+  be a speculative knob for a workload this testbed does not have — the merged
+  pool is strictly better on every workload measured. If an asymmetric workload
+  ever needs it, git history has the split wiring.
+- This removes two sizing knobs (`nio.num.reader.threads` / `nio.num.writer.threads`),
+  leaving one, and lets any I/O worker take any read or write job.
+
+Tier 0 is now implemented: one I/O pool per reactor (`nio.num.io.threads`,
+default 4). The `nio.num.reader.threads` / `nio.num.writer.threads` knobs are gone.
 
 Tier 1 — absorb the dispatcher (later, gated on measurement):
 
@@ -75,7 +82,7 @@ at real blocking boundaries.
 Positive:
 
 - Fewer hand-offs, so less queue, wake-up, and cache-miss overhead on the I/O path.
-- One I/O pool is work-conserving and has one fewer knob to size.
+- One I/O pool is work-conserving and drops two knobs (reader/writer sizes) to one.
 - The design keeps a clear rule for where hand-offs belong, which is easier to
   reason about than "a stage per concern."
 
@@ -89,7 +96,8 @@ Negative:
 
 What this ADR does not do:
 
-- It does not remove the option to split I/O pools; that stays for asymmetric
-  workloads.
+- It does not keep a split-pool option. The split is removed outright (git history
+  preserves the wiring); reintroducing it would need its own ADR and a workload
+  that justifies it.
 - It does not commit Tier 1. Tier 1 is described here for direction but stays out
   until the benchmark supports it.

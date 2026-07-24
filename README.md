@@ -41,7 +41,7 @@ The NIO transport is a multi-stage reactor:
 
 ```
 accept  →  ConnectionRegistrar pool  →  IOReactor[i] (select)
-        (SSL handshake)               →  SocketReader / SocketWriter pools
+        (SSL handshake)               →  I/O pool (SocketReader / SocketWriter)
                                       →  MessageDispatcher
                                       →  MessageProcessor (sync or async)
 ```

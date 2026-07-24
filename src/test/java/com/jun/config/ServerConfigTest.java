@@ -73,4 +73,19 @@ public class ServerConfigTest {
         ServerConfig cfg = new ServerConfig(p);
         assertEquals(8080, cfg.getServerPort());
     }
+
+    @Test
+    public void ioThreadsDefault() {
+        ServerConfig cfg = new ServerConfig(new Properties());
+        assertEquals(4, cfg.getNioNumIoThreads());
+        assertEquals(1, cfg.getNioNumIoReactors());
+    }
+
+    @Test
+    public void ioThreadsOverride() {
+        Properties p = new Properties();
+        p.setProperty("nio.num.io.threads", "8");
+        ServerConfig cfg = new ServerConfig(p);
+        assertEquals(8, cfg.getNioNumIoThreads());
+    }
 }
