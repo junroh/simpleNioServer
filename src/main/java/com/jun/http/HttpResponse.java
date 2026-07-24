@@ -1,7 +1,5 @@
 package com.jun.http;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -65,22 +63,22 @@ public final class HttpResponse {
     /** @param omitBody true for HEAD responses: emit status line + headers (incl. the
      *                  Content-Length the body would have) but no body bytes. */
     public byte[] toBytes(boolean omitBody) {
-        try {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            String statusLine = httpVersion + " " + status + " " + reason + CRLF;
-            out.write(statusLine.getBytes(StandardCharsets.UTF_8));
-            for (Map.Entry<String, String> e : headers.entrySet()) {
-                String header = e.getKey() + ": " + e.getValue() + CRLF;
-                out.write(header.getBytes(StandardCharsets.UTF_8));
-            }
-            out.write(CRLF.getBytes(StandardCharsets.UTF_8));
-            if (!omitBody) {
-                out.write(body);
-            }
-            return out.toByteArray();
-        } catch (IOException e) {
-            // ByteArrayOutputStream never throws; satisfy the checked exception.
-            throw new RuntimeException(e);
+        // Build the whole head once, encode once — instead of a ByteArrayOutputStream plus a
+        // getBytes() per line — then splice the body with a single copy.
+        StringBuilder head = new StringBuilder(64 + headers.size() * 32);
+        head.append(httpVersion).append(' ').append(status).append(' ').append(reason).append(CRLF);
+        for (Map.Entry<String, String> e : headers.entrySet()) {
+            head.append(e.getKey()).append(": ").append(e.getValue()).append(CRLF);
         }
+        head.append(CRLF);
+        byte[] headBytes = head.toString().getBytes(StandardCharsets.UTF_8);
+
+        if (omitBody || body.length == 0) {
+            return headBytes;
+        }
+        byte[] out = new byte[headBytes.length + body.length];
+        System.arraycopy(headBytes, 0, out, 0, headBytes.length);
+        System.arraycopy(body, 0, out, headBytes.length, body.length);
+        return out;
     }
 }

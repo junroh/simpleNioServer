@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 public final class HttpRequestParser {
 
     private static final int MAX_REQUEST_SIZE = 8 * 1024 * 1024;
+    private static final byte[] EMPTY_BODY = new byte[0];
 
     public interface Listener {
         void onRequest(HttpRequest request);
@@ -98,7 +99,9 @@ public final class HttpRequestParser {
         if ("HTTP/1.0".equals(currentVersion)) {
             currentHeaders.keepAlive = false;
         }
-        currentBody = new ByteArrayOutputStream();
+        // currentBody is created lazily (bodyOut) only when a body is actually present, so
+        // the common bodyless request (GET /hello) allocates no ByteArrayOutputStream.
+        currentBody = null;
         pos = eol + 2;
         state = State.NEED_HEADERS;
         return true;
@@ -183,7 +186,7 @@ public final class HttpRequestParser {
             return false;
         }
         int take = (int) Math.min(available, bodyBytesRemaining);
-        currentBody.write(buf, pos, take);
+        bodyOut().write(buf, pos, take);
         pos += take;
         bodyBytesRemaining -= take;
         if (bodyBytesRemaining == 0) {
@@ -226,7 +229,7 @@ public final class HttpRequestParser {
         }
         if (currentChunkBytesRemaining > 0) {
             int take = (int) Math.min(available, currentChunkBytesRemaining);
-            currentBody.write(buf, pos, take);
+            bodyOut().write(buf, pos, take);
             pos += take;
             currentChunkBytesRemaining -= take;
             if (currentBody.size() > MAX_REQUEST_SIZE) {
@@ -266,7 +269,7 @@ public final class HttpRequestParser {
     private void emitRequest() {
         HttpRequest req = new HttpRequest(
                 currentMethod, currentUri, currentVersion,
-                currentHeaders, currentBody.toByteArray());
+                currentHeaders, currentBody != null ? currentBody.toByteArray() : EMPTY_BODY);
         listener.onRequest(req);
 
         currentMethod = null;
@@ -284,6 +287,14 @@ public final class HttpRequestParser {
             errored = true;
             listener.onError(message);
         }
+    }
+
+    /** Lazily create the body accumulator on first body byte — bodyless requests never do. */
+    private ByteArrayOutputStream bodyOut() {
+        if (currentBody == null) {
+            currentBody = new ByteArrayOutputStream();
+        }
+        return currentBody;
     }
 
     private int findCrlf(int start, int end) {

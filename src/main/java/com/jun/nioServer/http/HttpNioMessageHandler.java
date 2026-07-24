@@ -39,7 +39,9 @@ public class HttpNioMessageHandler implements MessageProcessor {
         HttpResponse resp = appHandler.handle(req);
 
         Message response = new Message(connection, requestMessage.getId());
-        response.writeToMessage(resp.toBytes(req.isHead()));
+        // addChunk (not writeToMessage): toBytes() already returns a fresh array we own, so
+        // there is no need to copy it again.
+        response.addChunk(resp.toBytes(req.isHead()));
         connection.sendResponse(response);
 
         // Match the threaded transport: honour the peer's `Connection: close`. The actual

@@ -2,6 +2,7 @@ package com.jun.nioServer.message;
 
 import com.jun.nioServer.Connection;
 
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -22,7 +23,8 @@ public class Message {
 
     private final Connection connection;
     private final int id;
-    private final List<byte[]> chunks = new LinkedList<>();
+    /** Lazily created — request-side messages carry only a {@code payload} and never touch chunks. */
+    private List<byte[]> chunks;
     private Object payload;
 
     public Message(Connection connection) {
@@ -50,10 +52,27 @@ public class Message {
     public void writeToMessage(byte[] src, int offset, int length) {
         byte[] dst = new byte[length];
         System.arraycopy(src, offset, dst, 0, length);
-        chunks.add(dst);
+        addChunk(dst);
+    }
+
+    /**
+     * Append a chunk <em>without copying</em>; the message takes ownership, so the caller
+     * must not mutate {@code chunk} afterwards. Use when the array is freshly produced and
+     * not retained elsewhere (e.g. {@link com.jun.http.HttpResponse#toBytes}) — avoids the
+     * defensive copy {@link #writeToMessage} makes.
+     */
+    public void addChunk(byte[] chunk) {
+        chunks().add(chunk);
     }
 
     public List<byte[]> getChunks() {
+        return chunks == null ? Collections.emptyList() : chunks;
+    }
+
+    private List<byte[]> chunks() {
+        if (chunks == null) {
+            chunks = new LinkedList<>();
+        }
         return chunks;
     }
 

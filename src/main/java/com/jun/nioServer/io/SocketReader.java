@@ -57,8 +57,10 @@ public class SocketReader implements Runnable {
                     totalBytes += bytesRead;
                 }
                 if (totalBytes >= maxBytesPerRead) {
-                    log.debug("read budget exhausted on socketid " + connection.getSocketId()
-                            + " (read " + totalBytes + " bytes)");
+                    if (log.isDebugEnabled()) {
+                        log.debug("read budget exhausted on socketid " + connection.getSocketId()
+                                + " (read " + totalBytes + " bytes)");
+                    }
                     break;
                 }
             } while (bytesRead > 0);

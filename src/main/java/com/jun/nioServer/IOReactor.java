@@ -207,7 +207,9 @@ public class IOReactor implements Runnable {
                 if (e instanceof ClosedChannelException) {
                     // Normal flow: client closed the socket after receiving the response.
                     // Not a real error; log at debug so it doesn't pollute the console.
-                    log.debug("client closed socketid " + conn.getSocketId());
+                    if (log.isDebugEnabled()) {
+                        log.debug("client closed socketid " + conn.getSocketId());
+                    }
                 } else {
                     log.warn("Error on reading " + e + " on socketid " + conn.getSocketId() + "; closing.");
                 }
