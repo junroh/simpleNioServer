@@ -88,4 +88,16 @@ public class ServerConfigTest {
         ServerConfig cfg = new ServerConfig(p);
         assertEquals(8, cfg.getNioNumIoThreads());
     }
+
+    @Test
+    public void ioInlineDefaultsOff() {
+        assertFalse(new ServerConfig(new Properties()).isNioIoInline());
+    }
+
+    @Test
+    public void ioInlineCanBeEnabled() {
+        Properties p = new Properties();
+        p.setProperty("nio.io.inline", "true");
+        assertTrue(new ServerConfig(p).isNioIoInline());
+    }
 }

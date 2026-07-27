@@ -46,6 +46,12 @@ public class ConnectionTest {
     }
 
     @Test
+    public void plaintextConnectionIsNotSecure() throws Exception {
+        // No SSLContext supplied → no SSLEngineBuffer → inline-eligible (ADR 0005 routing).
+        assertFalse(newConnection().isSecure());
+    }
+
+    @Test
     public void neverClosesWithoutACloseRequest() throws Exception {
         Connection conn = newConnection();
 

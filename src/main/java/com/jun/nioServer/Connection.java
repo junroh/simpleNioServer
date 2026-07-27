@@ -149,6 +149,12 @@ public class Connection {
         return messageReader;
     }
 
+    /** True if this connection runs TLS — its read/write path does SSL encrypt/decrypt (heavy
+     *  per-record CPU), so the reactor offloads it to the I/O pool even in inline mode (ADR 0005). */
+    public boolean isSecure() {
+        return sslEngineBuffer != null;
+    }
+
     /**
      * Publish the SelectionKey. Runs on the reactor thread (from the register task);
      * {@link IOReactor#register} already set OP_READ + attachment atomically, so this only

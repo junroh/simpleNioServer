@@ -46,6 +46,7 @@ public class IOReactor implements Runnable {
     private final ExecutorService ioPool;
     private final int maxBytesPerRead;
     private final int maxBytesPerWrite;
+    private final boolean inlineIo;
 
     public IOReactor(Selector selector,
                      MessageDispatcher messageDispatcher,
@@ -53,6 +54,16 @@ public class IOReactor implements Runnable {
                      ExecutorService ioPool,
                      int maxBytesPerRead,
                      int maxBytesPerWrite) {
+        this(selector, messageDispatcher, readerFactory, ioPool, maxBytesPerRead, maxBytesPerWrite, false);
+    }
+
+    public IOReactor(Selector selector,
+                     MessageDispatcher messageDispatcher,
+                     MessageReaderFactory readerFactory,
+                     ExecutorService ioPool,
+                     int maxBytesPerRead,
+                     int maxBytesPerWrite,
+                     boolean inlineIo) {
         if (maxBytesPerRead <= 0) {
             throw new IllegalArgumentException("maxBytesPerRead must be positive");
         }
@@ -65,6 +76,7 @@ public class IOReactor implements Runnable {
         this.ioPool = Objects.requireNonNull(ioPool, "ioPool");
         this.maxBytesPerRead = maxBytesPerRead;
         this.maxBytesPerWrite = maxBytesPerWrite;
+        this.inlineIo = inlineIo;
     }
 
     /** Grace + force window for I/O pool shutdown. I/O threads may be parked
@@ -222,7 +234,7 @@ public class IOReactor implements Runnable {
                 conn.close();
             }
         };
-        ioPool.submit(new SocketReader(conn, callback, maxBytesPerRead));
+        ioDispatch(conn, new SocketReader(conn, callback, maxBytesPerRead));
     }
 
     private void onWrite(Connection conn) {
@@ -239,6 +251,28 @@ public class IOReactor implements Runnable {
                 conn.close();
             }
         };
-        ioPool.submit(new SocketWriter(conn, callback, maxBytesPerWrite));
+        ioDispatch(conn, new SocketWriter(conn, callback, maxBytesPerWrite));
+    }
+
+    /**
+     * Run an I/O task (read or write). In inline mode the reactor runs the cheap path — plaintext,
+     * bounded per turn by {@code maxBytesPerRead}/{@code maxBytesPerWrite} — on its own thread, so
+     * the bytes stay cache-hot and no hand-off is paid (ADR 0005). TLS connections keep offloading
+     * to the I/O pool: their SSL encrypt/decrypt is heavy per-record CPU that would otherwise
+     * serialise onto the reactor. With inline mode off, everything offloads (SEDA behaviour).
+     */
+    private void ioDispatch(Connection conn, Runnable io) {
+        if (inlineIo && !conn.isSecure()) {
+            try {
+                io.run();
+            } catch (Exception e) {
+                // SocketReader/SocketWriter handle their own I/O errors; this only guards the
+                // reactor loop against an unexpected throw so one connection can't skip the rest.
+                log.error("inline I/O failed on socketid " + conn.getSocketId() + "; closing.", e);
+                conn.close();
+            }
+        } else {
+            ioPool.submit(io);
+        }
     }
 }

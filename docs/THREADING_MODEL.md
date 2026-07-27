@@ -122,6 +122,10 @@ Two invariants protect these threads:
 - **Fairness via `maxBytesPerRead`.** `SocketReader` caps how much it
   pulls per turn, then re-arms `OP_READ` and returns. One chatty connection
   cannot monopolise a pool thread; it gets another turn next select cycle.
+  `SocketWriter` mirrors this with `maxBytesPerWrite`: it writes at most that
+  many bytes per turn, returns the remainder to the queue, and re-arms
+  `OP_WRITE` — so a large response is chunked across turns and cannot monopolise
+  a worker (or, under `nio.io.inline`, the reactor thread).
 - **One worker per connection at a time.** `Connection.tryReadLock` /
   `tryWriteLock` are try-locks; a second worker handed the same connection
   returns immediately instead of blocking. Concurrency *across* connections,
@@ -216,6 +220,17 @@ any job — [ADR 0004](adr/0004-handoff-boundaries.md)). Non-blocking,
 CPU-bound byte work (copy, and for SSL, encrypt/decrypt). Default **4**.
 Increase only if reads/writes visibly queue behind a busy reactor *and*
 there are spare cores. Total is `R × io`, so scales with R.
+
+**`nio.io.inline`** — when **true**, the reactor runs the *plaintext* read/write
+inline on its own thread instead of submitting to the I/O pool, so the bytes stay
+cache-hot and no reactor→pool hand-off is paid ([ADR 0005](adr/0005-single-loop-consolidation.md)).
+TLS connections still offload (their per-record crypto is heavy). Bounded per turn
+by `maxBytesPerRead` / `maxBytesPerWrite`, so a large transfer cannot monopolise the
+loop. Default **false** (offload everything — the SEDA behaviour). Pair with
+`nio.num.io.reactors` = cores so inline I/O still uses every core (one loop per core,
+connections partitioned). The dispatcher hand-off is unchanged here — parsing still
+runs on the dispatcher thread (that hand-off is [ADR 0004](adr/0004-handoff-boundaries.md)
+Tier 1's target).
 
 **`nio.registrar.pool.size`** — caps concurrent in-flight handshakes.
 Work-absorbing — threads here block during TLS round-trips. Each parked

@@ -25,6 +25,7 @@ import java.util.Properties;
  *
  *   nio.num.io.reactors             — IOReactor count
  *   nio.num.io.threads              — I/O pool size per reactor
+ *   nio.io.inline                   — run plaintext read/write inline on the reactor (ADR 0005); TLS still offloads
  *   nio.async.dispatch.enabled      — wrap MessageProcessor in AsyncMessageProcessor
  *   nio.async.dispatch.executor     — "virtual" | "fixed:&lt;N&gt;"
  *   nio.registrar.pool.size         — max concurrent connection registrations / SSL handshakes
@@ -54,6 +55,7 @@ public final class ServerConfig {
     public static final int    DEFAULT_THREADED_POOL_SIZE           = 100;
     public static final int    DEFAULT_NIO_NUM_IO_REACTORS          = 1;
     public static final int    DEFAULT_NIO_NUM_IO_THREADS           = 4;
+    public static final boolean DEFAULT_NIO_IO_INLINE               = false;
     public static final boolean DEFAULT_NIO_ASYNC_DISPATCH_ENABLED  = false;
     public static final String DEFAULT_NIO_ASYNC_DISPATCH_EXECUTOR  = "fixed:500";
     public static final int    DEFAULT_NIO_REGISTRAR_POOL_SIZE      = 64;
@@ -75,6 +77,7 @@ public final class ServerConfig {
 
     private final int nioNumIoReactors;
     private final int nioNumIoThreads;
+    private final boolean nioIoInline;
     private final boolean nioAsyncDispatchEnabled;
     private final String nioAsyncDispatchExecutor;
     private final int nioRegistrarPoolSize;
@@ -106,6 +109,7 @@ public final class ServerConfig {
 
         this.nioNumIoReactors = getPositiveInt(props, "nio.num.io.reactors", DEFAULT_NIO_NUM_IO_REACTORS);
         this.nioNumIoThreads = getPositiveInt(props, "nio.num.io.threads", DEFAULT_NIO_NUM_IO_THREADS);
+        this.nioIoInline = getBoolean(props, "nio.io.inline", DEFAULT_NIO_IO_INLINE);
         this.nioAsyncDispatchEnabled = getBoolean(props, "nio.async.dispatch.enabled", DEFAULT_NIO_ASYNC_DISPATCH_ENABLED);
         this.nioAsyncDispatchExecutor = props.getProperty("nio.async.dispatch.executor", DEFAULT_NIO_ASYNC_DISPATCH_EXECUTOR);
         this.nioRegistrarPoolSize = getPositiveInt(props, "nio.registrar.pool.size", DEFAULT_NIO_REGISTRAR_POOL_SIZE);
@@ -165,6 +169,10 @@ public final class ServerConfig {
 
     public int getNioNumIoThreads() {
         return nioNumIoThreads;
+    }
+
+    public boolean isNioIoInline() {
+        return nioIoInline;
     }
 
     public boolean isNioAsyncDispatchEnabled() {

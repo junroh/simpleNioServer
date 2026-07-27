@@ -17,6 +17,8 @@ import com.jun.config.ServerConfig;
  * @param truststorePassword    password for the truststore
  * @param numIoReactors         number of {@link IOReactor}s (each on its own thread)
  * @param numIoThreads          I/O pool size per reactor
+ * @param inlineIo              run plaintext read/write inline on the reactor thread instead of
+ *                              offloading to the I/O pool (ADR 0005); TLS connections still offload
  * @param acceptorBacklog       OS accept-queue depth
  * @param acceptorNonBlocking   {@code ServerSocketChannel.configureBlocking()} inverse
  * @param clientSocketBlocking  blocking mode for accepted client sockets (almost always false for NIO)
@@ -40,6 +42,7 @@ public record NioServerSettings(
         String truststorePassword,
         int numIoReactors,
         int numIoThreads,
+        boolean inlineIo,
         int acceptorBacklog,
         boolean acceptorNonBlocking,
         boolean clientSocketBlocking,
@@ -61,6 +64,7 @@ public record NioServerSettings(
                 .truststorePassword(cfg.getSslTruststorePassword())
                 .numIoReactors(cfg.getNioNumIoReactors())
                 .numIoThreads(cfg.getNioNumIoThreads())
+                .inlineIo(cfg.isNioIoInline())
                 .acceptorBacklog(cfg.getServerBacklog())
                 .registrarPoolSize(cfg.getNioRegistrarPoolSize())
                 .registrarQueueCapacity(cfg.getNioRegistrarQueueCapacity())
@@ -83,6 +87,7 @@ public record NioServerSettings(
         private String truststorePassword;
         private int numIoReactors = 1;
         private int numIoThreads = 4;
+        private boolean inlineIo = false;
         private int acceptorBacklog = 1024;
         private boolean acceptorNonBlocking = true;
         private boolean clientSocketBlocking = false;
@@ -102,6 +107,7 @@ public record NioServerSettings(
         public Builder truststorePassword(String v) { this.truststorePassword = v;    return this; }
         public Builder numIoReactors(int v)         { this.numIoReactors = v;         return this; }
         public Builder numIoThreads(int v)          { this.numIoThreads = v;          return this; }
+        public Builder inlineIo(boolean v)          { this.inlineIo = v;              return this; }
         public Builder acceptorBacklog(int v)       { this.acceptorBacklog = v;       return this; }
         public Builder acceptorNonBlocking(boolean v)  { this.acceptorNonBlocking = v;  return this; }
         public Builder clientSocketBlocking(boolean v) { this.clientSocketBlocking = v; return this; }
@@ -116,7 +122,7 @@ public record NioServerSettings(
                     port, hostAddress, sslEnabled,
                     keystorePath, keystorePassword, keyPassword,
                     truststorePath, truststorePassword,
-                    numIoReactors, numIoThreads,
+                    numIoReactors, numIoThreads, inlineIo,
                     acceptorBacklog, acceptorNonBlocking, clientSocketBlocking,
                     maxBytesPerRead,
                     maxBytesPerWrite,
