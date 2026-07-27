@@ -9,17 +9,25 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * Drains the connection's pending write buffers on a worker thread. If a buffer is only
- * partially written (kernel buffer full), re-arms OP_WRITE so the reactor will retry.
+ * Drains the connection's pending write buffers on a worker thread, up to {@code maxBytesPerWrite}
+ * bytes per turn. If a buffer is only partially written (kernel buffer full) or the per-turn cap
+ * is hit, the remaining buffers are returned to the queue and OP_WRITE is re-armed so the reactor
+ * retries — so a large response cannot monopolise the worker (or, in an inline transport, the
+ * reactor thread). Mirrors {@code SocketReader}'s {@code maxBytesPerRead} fairness cap.
  */
 public class SocketWriter implements Runnable {
 
     private final Connection connection;
     private final IoCallback callback;
+    private final int maxBytesPerWrite;
 
-    public SocketWriter(Connection connection, IoCallback callback) {
+    public SocketWriter(Connection connection, IoCallback callback, int maxBytesPerWrite) {
+        if (maxBytesPerWrite <= 0) {
+            throw new IllegalArgumentException("maxBytesPerWrite must be positive");
+        }
         this.connection = connection;
         this.callback = callback;
+        this.maxBytesPerWrite = maxBytesPerWrite;
     }
 
     @Override
@@ -38,19 +46,22 @@ public class SocketWriter implements Runnable {
             int totalWritten = 0;
             while (itr.hasNext()) {
                 ByteBuffer buffer = itr.next();
-                int bytesWritten = drain(connection.getSocketChannel(), buffer);
-                totalWritten += bytesWritten;
-                if (!buffer.hasRemaining()) {
-                    itr.remove();
-                } else {
+                totalWritten += drain(connection.getSocketChannel(), buffer,
+                        maxBytesPerWrite - totalWritten);
+                if (buffer.hasRemaining()) {
+                    // Kernel send buffer filled OR the per-turn cap capped this buffer: stop.
+                    break;
+                }
+                itr.remove();
+                if (totalWritten >= maxBytesPerWrite) {
+                    // Per-turn budget spent; leave the rest queued and yield to other work.
                     break;
                 }
             }
             if (!readyBuffers.isEmpty()) {
-                // Kernel send buffer filled: the broken buffer (partially written) plus any
-                // that follow are still pending. Return them to the front of the write queue
-                // so the next cycle resumes in order — otherwise the remainder is lost and a
-                // large response arrives truncated.
+                // Partially written / capped: return the broken buffer (and any that follow) to
+                // the front of the write queue so the next cycle resumes in order — otherwise the
+                // remainder is lost and a large response arrives truncated.
                 connection.returnUnwrittenBuffers(readyBuffers);
                 connection.requestWrite();
             }
@@ -65,13 +76,24 @@ public class SocketWriter implements Runnable {
         }
     }
 
-    private int drain(SocketChannel socketChannel, ByteBuffer buffer) throws IOException {
-        int written = socketChannel.write(buffer);
-        int totalBytesWritten = written;
-        while (written > 0 && buffer.hasRemaining()) {
-            written = socketChannel.write(buffer);
-            totalBytesWritten += written;
+    /** Write from {@code buffer} until it drains, the kernel send buffer fills, or {@code budget}
+     *  bytes have been written this turn — whichever comes first. Caps via a temporary limit so
+     *  the buffer's leftover stays visible for the next turn. */
+    private int drain(SocketChannel socketChannel, ByteBuffer buffer, int budget) throws IOException {
+        int originalLimit = buffer.limit();
+        if (buffer.remaining() > budget) {
+            buffer.limit(buffer.position() + budget);
         }
-        return totalBytesWritten;
+        try {
+            int written = socketChannel.write(buffer);
+            int totalBytesWritten = written;
+            while (written > 0 && buffer.hasRemaining()) {
+                written = socketChannel.write(buffer);
+                totalBytesWritten += written;
+            }
+            return totalBytesWritten;
+        } finally {
+            buffer.limit(originalLimit);
+        }
     }
 }

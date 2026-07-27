@@ -218,7 +218,7 @@ public class NioServerService {
         dispatcherThread.start();
 
         IOReactor reactor = new IOReactor(selector, dispatcher, readerFactory,
-                ioPool, settings.maxBytesPerRead());
+                ioPool, settings.maxBytesPerRead(), settings.maxBytesPerWrite());
         Thread reactorThread = new Thread(reactor, "IOReactor-" + idx);
         reactorThread.setDaemon(false);
         reactorThread.start();

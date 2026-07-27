@@ -26,6 +26,8 @@ public class SocketWriterTest {
 
     private SocketWriter writeHandler;
 
+    private static final int WRITE_BUDGET = 64 * 1024;
+
     @Before
     public void setUp() {
         org.mockito.MockitoAnnotations.initMocks(this);
@@ -33,7 +35,7 @@ public class SocketWriterTest {
         when(mockConnection.getSocketChannel()).thenReturn(mockSocketChannel);
         when(mockConnection.tryWriteLock()).thenReturn(true);
 
-        writeHandler = new SocketWriter(mockConnection, mockCompleteListener);
+        writeHandler = new SocketWriter(mockConnection, mockCompleteListener, WRITE_BUDGET);
     }
 
     @Test
@@ -137,6 +139,38 @@ public class SocketWriterTest {
         verify(mockConnection).drainWriteBuffers();
         verify(mockSocketChannel, never()).write(any(ByteBuffer.class));
         verify(mockCompleteListener).onComplete(eq(0), eq(null));
+        verify(mockConnection).unlockWrite();
+    }
+
+    @Test
+    public void testRun_PerTurnCap_YieldsAndReArms() throws IOException {
+        // One buffer larger than the cap: the writer must stop at the cap, leave the rest
+        // queued, and re-arm OP_WRITE — so a large response cannot monopolise the thread.
+        int cap = 10;
+        SocketWriter capped = new SocketWriter(mockConnection, mockCompleteListener, cap);
+
+        ByteBuffer buffer = ByteBuffer.allocate(25);
+        buffer.put(new byte[25]);
+        buffer.flip();
+        List<ByteBuffer> writeBuffers = new ArrayList<>();
+        writeBuffers.add(buffer);
+        when(mockConnection.drainWriteBuffers()).thenReturn(writeBuffers);
+
+        // Socket accepts everything offered (i.e. up to whatever limit the writer set).
+        when(mockSocketChannel.write(any(ByteBuffer.class))).thenAnswer(invocation -> {
+            ByteBuffer b = invocation.getArgument(0, ByteBuffer.class);
+            int r = b.remaining();
+            b.position(b.limit());
+            return r;
+        });
+
+        capped.run();
+
+        // Only `cap` bytes went out this turn; 15 remain.
+        verify(mockCompleteListener).onComplete(eq(cap), eq(null));
+        assertEquals(15, buffer.remaining());
+        verify(mockConnection).returnUnwrittenBuffers(writeBuffers);
+        verify(mockConnection).requestWrite();
         verify(mockConnection).unlockWrite();
     }
 

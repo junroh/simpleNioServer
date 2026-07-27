@@ -22,6 +22,9 @@ import com.jun.config.ServerConfig;
  * @param clientSocketBlocking  blocking mode for accepted client sockets (almost always false for NIO)
  * @param maxBytesPerRead       soft cap on bytes pulled per dispatch; prevents a single chatty
  *                              connection from monopolising an I/O-pool thread
+ * @param maxBytesPerWrite      soft cap on bytes pushed per write turn; the write yields and
+ *                              re-arms OP_WRITE after it, so a large response cannot monopolise
+ *                              an I/O worker (or, in an inline transport, the reactor thread)
  * @param registrarPoolSize     max concurrent connection registrations / SSL handshakes
  * @param registrarQueueCapacity registrar queue depth before new connections are rejected
  * @param sslHandshakeTimeoutMs watchdog deadline for a single SSL handshake (ms)
@@ -41,6 +44,7 @@ public record NioServerSettings(
         boolean acceptorNonBlocking,
         boolean clientSocketBlocking,
         int maxBytesPerRead,
+        int maxBytesPerWrite,
         int registrarPoolSize,
         int registrarQueueCapacity,
         int sslHandshakeTimeoutMs) {
@@ -83,6 +87,7 @@ public record NioServerSettings(
         private boolean acceptorNonBlocking = true;
         private boolean clientSocketBlocking = false;
         private int maxBytesPerRead = 64 * 1024;
+        private int maxBytesPerWrite = 64 * 1024;
         private int registrarPoolSize = 64;
         private int registrarQueueCapacity = 256;
         private int sslHandshakeTimeoutMs = 10_000;
@@ -101,6 +106,7 @@ public record NioServerSettings(
         public Builder acceptorNonBlocking(boolean v)  { this.acceptorNonBlocking = v;  return this; }
         public Builder clientSocketBlocking(boolean v) { this.clientSocketBlocking = v; return this; }
         public Builder maxBytesPerRead(int v)       { this.maxBytesPerRead = v;       return this; }
+        public Builder maxBytesPerWrite(int v)      { this.maxBytesPerWrite = v;      return this; }
         public Builder registrarPoolSize(int v)     { this.registrarPoolSize = v;     return this; }
         public Builder registrarQueueCapacity(int v){ this.registrarQueueCapacity = v; return this; }
         public Builder sslHandshakeTimeoutMs(int v) { this.sslHandshakeTimeoutMs = v; return this; }
@@ -113,6 +119,7 @@ public record NioServerSettings(
                     numIoReactors, numIoThreads,
                     acceptorBacklog, acceptorNonBlocking, clientSocketBlocking,
                     maxBytesPerRead,
+                    maxBytesPerWrite,
                     registrarPoolSize, registrarQueueCapacity, sslHandshakeTimeoutMs);
         }
     }

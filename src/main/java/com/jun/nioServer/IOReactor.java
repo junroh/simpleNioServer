@@ -45,20 +45,26 @@ public class IOReactor implements Runnable {
     private final MessageReaderFactory readerFactory;
     private final ExecutorService ioPool;
     private final int maxBytesPerRead;
+    private final int maxBytesPerWrite;
 
     public IOReactor(Selector selector,
                      MessageDispatcher messageDispatcher,
                      MessageReaderFactory readerFactory,
                      ExecutorService ioPool,
-                     int maxBytesPerRead) {
+                     int maxBytesPerRead,
+                     int maxBytesPerWrite) {
         if (maxBytesPerRead <= 0) {
             throw new IllegalArgumentException("maxBytesPerRead must be positive");
+        }
+        if (maxBytesPerWrite <= 0) {
+            throw new IllegalArgumentException("maxBytesPerWrite must be positive");
         }
         this.selector = Objects.requireNonNull(selector, "selector");
         this.messageDispatcher = Objects.requireNonNull(messageDispatcher, "messageDispatcher");
         this.readerFactory = Objects.requireNonNull(readerFactory, "readerFactory");
         this.ioPool = Objects.requireNonNull(ioPool, "ioPool");
         this.maxBytesPerRead = maxBytesPerRead;
+        this.maxBytesPerWrite = maxBytesPerWrite;
     }
 
     /** Grace + force window for I/O pool shutdown. I/O threads may be parked
@@ -233,6 +239,6 @@ public class IOReactor implements Runnable {
                 conn.close();
             }
         };
-        ioPool.submit(new SocketWriter(conn, callback));
+        ioPool.submit(new SocketWriter(conn, callback, maxBytesPerWrite));
     }
 }
