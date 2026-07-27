@@ -119,3 +119,18 @@ What this ADR does not do:
 - It does not adopt HTTP pipelining or HTTP/2 (orthogonal syscall-amortisation levers, not
   real-traffic throughput fixes).
 - It does not fix routing thresholds; they start as defaults and can be tuned later.
+
+## Implementation status
+
+- **Done — `maxBytesPerWrite`** (write-turn fairness cap, symmetric with `maxBytesPerRead`).
+- **Done — inline steady-state I/O** (`nio.io.inline`, default off): the reactor runs plaintext
+  read/write inline; **TLS steady-state offloads to the pool** (`Connection.isSecure()`), which
+  is the conservative, correct routing — its per-record crypto is the heavy step. Runtime
+  behaviour is unverified in-repo (integration tests need sockets).
+- **Deferred — SSL handshake model 3** (event-driven handshake in the reactor). This is a
+  security-sensitive rewrite: `SSLEngineBuffer.doHandshake()` is a blocking loop, and model 3
+  also inverts the accept path (register with the selector *before* the handshake) across
+  `NioAcceptor` / `ConnectionRegistrar` / `Connection` / `IOReactor`. It is **not landed** because
+  it cannot be verified without socket-level SSL integration tests; landing an unverified TLS
+  handshake would risk silently breaking TLS. The blocking model-2 registrar-pool handshake
+  (`docs/SSL_HANDSHAKE.md`) stays as the tested default until model 3 can be integration-tested.
